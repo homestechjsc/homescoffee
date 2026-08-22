@@ -873,8 +873,10 @@ switchTab(tabId) {
         },
         // Tạo URL gọi món cho bàn
 getTableQrUrl(tableId) {
-    const baseUrl = window.location.href.substring(0, window.location.href.lastIndexOf('/'));
-    return `${baseUrl}/khachorder.html?tableId=${tableId}`;
+    // Tự động nhận diện URL hiện tại và trỏ chính xác về file khachorder.html cùng thư mục
+    const currentUrl = window.location.href.split('?')[0].split('#')[0];
+    const basePath = currentUrl.substring(0, currentUrl.lastIndexOf('/'));
+    return `${basePath}/khachorder.html?tableId=${encodeURIComponent(tableId)}`;
 },
 
 // Mở modal xem QR của 1 bàn
