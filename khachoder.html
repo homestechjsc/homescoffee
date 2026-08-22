@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>E-Menu - Tự Gọi Món</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <style>
+        body { -webkit-tap-highlight-color: transparent; user-select: none; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased font-sans h-screen overflow-hidden flex flex-col" x-data="customerOrderApp()" x-init="init()">
+
+    <!-- HEADER QUÁN -->
+    <header class="bg-[#0072bc] text-white px-4 py-3 shadow-md flex justify-between items-center flex-shrink-0">
+        <div>
+            <h1 class="font-black text-sm tracking-wide flex items-center gap-1.5">
+                <i class="fa-solid fa-mug-saucer text-amber-300"></i> HOMES COFFEE
+            </h1>
+            <p class="text-[11px] text-blue-100" x-text="tableName ? ('Quý khách đang ngồi: ' + tableName) : 'Đang tải thông tin bàn...'"></p>
+        </div>
+
+        <button @click="showCartModal = true" class="relative px-3 py-1.5 bg-amber-500 hover:bg-amber-600 rounded-xl text-xs font-black flex items-center gap-1.5 shadow">
+            <i class="fa-solid fa-cart-shopping"></i>
+            <span x-text="totalCartQty"></span>
+        </button>
+    </header>
+
+    <!-- TRẠNG THÁI ĐƠN HÀNG CỦA BÀN (NẾU CÓ ĐƠN ĐANG CHỜ HOẶC ĐANG PHỤC VỤ) -->
+    <div x-show="orderStatus" class="p-2.5 px-4 text-xs font-bold flex items-center justify-between shadow-sm transition-all"
+         :class="{
+             'bg-amber-500 text-white animate-pulse': orderStatus === 'pending',
+             'bg-emerald-600 text-white': orderStatus === 'accepted',
+             'bg-blue-600 text-white': orderStatus === 'serving'
+         }">
+        <div class="flex items-center gap-2">
+            <i class="fa-solid" :class="{
+                'fa-clock': orderStatus === 'pending',
+                'fa-circle-check': orderStatus === 'accepted',
+                'fa-bell-concierge': orderStatus === 'serving'
+            }"></i>
+            <span x-text="orderStatusText"></span>
+        </div>
+        <span class="text-[10px] bg-black/20 px-2 py-0.5 rounded-full" x-text="orderStatus === 'pending' ? 'Vui lòng đợi nhân viên' : 'Bếp đang pha chế'"></span>
+    </div>
+
+    <!-- TÌM KIẾM & DANH MỤC -->
+    <div class="bg-white p-3 border-b shadow-sm space-y-2 flex-shrink-0">
+        <div class="relative">
+            <input type="text" x-model="searchQuery" placeholder="Tìm kiếm đồ uống, món ăn..." class="w-full pl-8 pr-3 py-2 bg-slate-100 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[#0072bc]">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
+        </div>
+
+        <div class="flex gap-1.5 overflow-x-auto hide-scrollbar pb-0.5">
+            <template x-for="cat in categories" :key="cat">
+                <button @click="activeCategory = cat" :class="activeCategory === cat ? 'bg-[#0072bc] text-white font-bold' : 'bg-slate-100 text-slate-600'" class="px-3.5 py-1.5 rounded-xl text-xs whitespace-nowrap transition" x-text="cat"></button>
+            </template>
+        </div>
+    </div>
+
+    <!-- DANH SÁCH MÓN ĂN / ĐỒ UỐNG -->
+    <div class="flex-1 p-3 overflow-y-auto space-y-2.5">
+        <template x-for="m in filteredMenu" :key="m.id">
+            <div class="bg-white p-2.5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between active:scale-[0.99] transition">
+                <div class="flex items-center gap-3">
+                    <template x-if="m.image">
+                        <img :src="m.image" class="w-14 h-14 rounded-xl object-cover border">
+                    </template>
+                    <template x-if="!m.image">
+                        <div class="w-14 h-14 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 border text-lg">
+                            <i class="fa-solid fa-mug-hot"></i>
+                        </div>
+                    </template>
+                    <div>
+                        <h3 class="font-black text-xs text-slate-800" x-text="m.name"></h3>
+                        <span class="text-[10px] text-slate-400" x-text="m.category"></span>
+                        <p class="font-black text-xs text-[#0072bc] mt-1" x-text="(m.price || 0).toLocaleString() + 'đ'"></p>
+                    </div>
+                </div>
+
+                <button @click="addToCart(m)" class="w-8 h-8 rounded-xl bg-blue-50 text-[#0072bc] flex items-center justify-center font-bold active:bg-[#0072bc] active:text-white transition shadow-sm">
+                    <i class="fa-solid fa-plus text-sm"></i>
+                </button>
+            </div>
+        </template>
+    </div>
+
+    <!-- THANH FOOTER XÁC NHẬN ORDER -->
+    <div class="bg-white border-t p-3 flex items-center justify-between shadow-lg flex-shrink-0">
+        <div>
+            <p class="text-[10px] text-slate-400">TỔNG TIỀN DỰ TÍNH:</p>
+            <p class="font-black text-base text-[#0072bc]" x-text="subTotal().toLocaleString() + 'đ'"></p>
+        </div>
+        <button @click="showCartModal = true" class="px-5 py-2.5 bg-[#0072bc] hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-wide shadow flex items-center gap-1.5">
+            <i class="fa-solid fa-bell"></i> Gọi Món (<span x-text="totalCartQty"></span>)
+        </button>
+    </div>
+
+    <!-- DRAWER GIỎ HÀNG XÁC NHẬN GỬI ĐƠN -->
+    <div x-show="showCartModal" class="fixed inset-0 z-50 flex flex-col justify-end bg-slate-900/60 backdrop-blur-sm" style="display: none;">
+        <div class="bg-white w-full max-h-[80vh] rounded-t-3xl p-4 flex flex-col space-y-3 shadow-2xl">
+            <div class="flex justify-between items-center border-b pb-2">
+                <div>
+                    <h3 class="font-black text-sm text-slate-800">Xác Nhận Gọi Món</h3>
+                    <p class="text-[10px] text-slate-400" x-text="'Bàn phục vụ: ' + tableName"></p>
+                </div>
+                <button @click="showCartModal = false" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <!-- Danh sách món trong giỏ -->
+            <div class="flex-1 overflow-y-auto space-y-2 max-h-60 pr-1">
+                <template x-if="cartItems.length === 0">
+                    <p class="text-center text-xs text-slate-400 py-6">Quý khách chưa chọn món nào</p>
+                </template>
+                <template x-for="(item, idx) in cartItems" :key="idx">
+                    <div class="flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                        <div class="flex-1 pr-2">
+                            <p class="font-bold text-xs text-slate-800" x-text="item.name"></p>
+                            <p class="text-[10px] text-slate-500" x-text="(item.price * item.qty).toLocaleString() + 'đ'"></p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button @click="updateQty(idx, -1)" class="w-6 h-6 rounded bg-white border text-slate-600 font-bold">-</button>
+                            <span class="font-bold text-xs w-4 text-center" x-text="item.qty"></span>
+                            <button @click="updateQty(idx, 1)" class="w-6 h-6 rounded bg-white border text-slate-600 font-bold">+</button>
+                            <button @click="removeItem(idx)" class="text-red-500 ml-1 p-1"><i class="fa-solid fa-trash text-xs"></i></button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Ghi chú cho quán -->
+            <div>
+                <input type="text" x-model="customerNote" placeholder="Ghi chú (ít đá, ít đường, không sữa...)" class="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs focus:outline-none">
+            </div>
+
+            <!-- Nút gửi Order -->
+            <div class="pt-2 border-t flex gap-2">
+                <button @click="showCartModal = false" class="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold">Chọn Thêm Món</button>
+                <button @click="submitOrder()" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-paper-plane"></i> Gửi Order Ngay
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT XỬ LÝ -->
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCjolGY6uh5pY7CHIc0ON6m8qNSz5xJDXM",
+            authDomain: "dbcoffee-bbeaf.firebaseapp.com",
+            databaseURL: "https://dbcoffee-bbeaf-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "dbcoffee-bbeaf",
+            storageBucket: "dbcoffee-bbeaf.firebasestorage.app",
+            messagingSenderId: "118275632803",
+            appId: "1:118275632803:web:459762b6ace8d1c25ed916",
+            measurementId: "G-MHVZ55R50Y"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        function customerOrderApp() {
+            return {
+                tableId: '',
+                tableName: 'Đang kết nối...',
+                categories: ['Tất cả'],
+                activeCategory: 'Tất cả',
+                menuItems: [],
+                searchQuery: '',
+                cartItems: [],
+                customerNote: '',
+                showCartModal: false,
+                orderStatus: null, // 'pending' (chờ nhận) | 'serving' (đang phục vụ)
+
+                get orderStatusText() {
+                    if (this.orderStatus === 'pending') return 'Đơn hàng đang chờ nhân viên tiếp nhận...';
+                    if (this.orderStatus === 'serving') return 'Nhân viên đã tiếp nhận! Đơn đang được phục vụ.';
+                    return '';
+                },
+
+                init() {
+                    // Lấy mã bàn từ URL Parameters: ?tableId=... hoặc ?table=...
+                    const params = new URLSearchParams(window.location.search);
+                    this.tableId = params.get('tableId') || params.get('table') || 'TABLE_DEFAULT';
+
+                    // Lấy tên bàn từ Firebase
+                    db.ref('tables/' + this.tableId).on('value', snap => {
+                        const t = snap.val();
+                        if (t) {
+                            this.tableName = t.name + ' (' + t.area + ')';
+                        } else {
+                            this.tableName = 'Bàn ' + this.tableId;
+                        }
+                    });
+
+                    // Lấy menu món
+                    db.ref('menu').on('value', snap => {
+                        const d = snap.val();
+                        this.menuItems = d ? Object.keys(d).map(k => ({ id: k, ...d[k] })) : [];
+                    });
+
+                    // Lấy danh mục
+                    db.ref('categories').on('value', snap => {
+                        const d = snap.val();
+                        if (d && Array.isArray(d)) this.categories = ['Tất cả', ...d.filter(c => c !== 'Tất cả')];
+                    });
+
+                    // Lắng nghe trạng thái đơn tự gọi của bàn này
+                    db.ref('pendingOrders/' + this.tableId).on('value', snap => {
+                        const d = snap.val();
+                        if (d) {
+                            this.orderStatus = d.status || 'pending'; // 'pending' hoặc 'serving'
+                        } else {
+                            this.orderStatus = null;
+                        }
+                    });
+                },
+
+                get filteredMenu() {
+                    let list = this.menuItems;
+                    if (this.activeCategory !== 'Tất cả') list = list.filter(i => i.category === this.activeCategory);
+                    if (this.searchQuery.trim()) list = list.filter(i => i.name.toLowerCase().includes(this.searchQuery.toLowerCase()));
+                    return list;
+                },
+
+                get totalCartQty() {
+                    return this.cartItems.reduce((s, i) => s + Number(i.qty), 0);
+                },
+
+                addToCart(m) {
+                    let exist = this.cartItems.find(i => i.name === m.name);
+                    if (exist) exist.qty++;
+                    else this.cartItems.push({ name: m.name, price: m.price, qty: 1, recipeList: m.recipeList || [] });
+                },
+
+                updateQty(idx, delta) {
+                    this.cartItems[idx].qty += delta;
+                    if (this.cartItems[idx].qty <= 0) this.cartItems.splice(idx, 1);
+                },
+
+                removeItem(idx) { this.cartItems.splice(idx, 1); },
+
+                subTotal() {
+                    return this.cartItems.reduce((s, i) => s + (i.price * i.qty), 0);
+                },
+
+                submitOrder() {
+                    if (this.cartItems.length === 0) {
+                        alert('Vui lòng chọn ít nhất 1 món!');
+                        return;
+                    }
+
+                    // Đẩy đơn vào hàng đợi tiếp nhận
+                    const orderPayload = {
+                        tableId: this.tableId,
+                        tableName: this.tableName,
+                        items: this.cartItems,
+                        note: this.customerNote,
+                        total: this.subTotal(),
+                        status: 'pending', // Trạng thái chờ tiếp nhận
+                        timestamp: new Date().toISOString()
+                    };
+
+                    db.ref('pendingOrders/' + this.tableId).set(orderPayload);
+
+                    alert('Đã gửi yêu cầu gọi món thành công! Nhân viên sẽ duyệt và phục vụ ngay.');
+                    this.showCartModal = false;
+                    this.cartItems = [];
+                    this.customerNote = '';
+                }
+            };
+        }
+    </script>
+</body>
+</html>

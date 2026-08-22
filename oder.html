@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CUKCUK Mobile Order - Phục Vụ</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <!-- Firebase SDK (v8) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <style>
+        /* Tối ưu cảm ứng di động */
+        body {
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased font-sans h-screen overflow-hidden flex flex-col" x-data="mobileOrderApp()" x-init="init()">
+
+    <!-- ================= 1. MÀN HÌNH ĐĂNG NHẬP (NẾU CHƯA ĐĂNG NHẬP) ================= -->
+    <div x-show="!currentUser" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/90 p-4">
+        <div class="bg-white w-full max-w-xs rounded-3xl p-6 shadow-2xl space-y-4">
+            <div class="text-center">
+                <div class="w-14 h-14 bg-[#0072bc] text-white rounded-2xl flex items-center justify-center mx-auto mb-2 text-2xl shadow-lg shadow-blue-500/30">
+                    <i class="fa-solid fa-utensils"></i>
+                </div>
+                <h2 class="font-black text-lg text-slate-800">CUKCUK ORDER</h2>
+                <p class="text-xs text-slate-400">Dành cho nhân viên phục vụ</p>
+            </div>
+
+            <form @submit.prevent="login()" class="space-y-3">
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Tài khoản</label>
+                    <input type="text" x-model="loginForm.username" placeholder="Tên đăng nhập..." required class="w-full px-3 py-2.5 bg-slate-50 border rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0072bc]">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Mã PIN</label>
+                    <input type="password" maxlength="6" x-model="loginForm.pin" placeholder="Mã PIN (VD: 1234)..." required class="w-full px-3 py-2.5 bg-slate-50 border rounded-xl text-xs font-mono tracking-widest focus:outline-none focus:border-[#0072bc]">
+                </div>
+                <button type="submit" class="w-full py-3 bg-[#0072bc] hover:bg-blue-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-lg shadow-blue-600/30 transition">
+                    Đăng Nhập
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= 2. HEADER TOP MOBILE ================= -->
+    <header class="bg-[#0072bc] text-white px-3 py-2.5 flex justify-between items-center shadow-md flex-shrink-0">
+        <div class="flex items-center gap-2">
+            <!-- Nút back khi đang gọi món -->
+            <button x-show="view === 'ordering'" @click="view = 'tables'" class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center active:scale-90 transition">
+                <i class="fa-solid fa-arrow-left text-sm"></i>
+            </button>
+            <div>
+                <h1 class="font-extrabold text-sm tracking-wide" x-text="view === 'tables' ? 'SƠ ĐỒ BÀN' : selectedTable?.name"></h1>
+                <p class="text-[10px] text-blue-100" x-text="currentUser ? (currentUser.name + ' (' + currentUser.role + ')') : ''"></p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <!-- Giỏ hàng nổi khi đang gọi món -->
+            <button x-show="view === 'ordering'" @click="showCartDrawer = true" class="relative px-3 py-1.5 bg-amber-500 hover:bg-amber-600 rounded-xl text-xs font-black flex items-center gap-1 shadow">
+                <i class="fa-solid fa-cart-shopping"></i>
+                <span x-text="totalCartItems"></span>
+            </button>
+
+            <!-- Nút đăng xuất -->
+            <button @click="logout()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-red-600 text-white flex items-center justify-center transition">
+                <i class="fa-solid fa-power-off text-xs"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- ================= 3. GIAO DIỆN CHÍNH ================= -->
+
+    <!-- VIEW 1: SƠ ĐỒ BÀN (TABLES) -->
+    <div x-show="view === 'tables'" class="flex-1 flex flex-col overflow-hidden">
+        <!-- Thanh lọc khu vực -->
+        <div class="bg-white px-3 py-2 border-b flex gap-2 overflow-x-auto hide-scrollbar flex-shrink-0">
+            <button @click="selectedArea = 'Tất cả'" :class="selectedArea === 'Tất cả' ? 'bg-[#0072bc] text-white font-bold' : 'bg-slate-100 text-slate-600'" class="px-3.5 py-1.5 rounded-full text-xs whitespace-nowrap transition">
+                Tất cả
+            </button>
+            <template x-for="area in areas" :key="area">
+                <button @click="selectedArea = area" :class="selectedArea === area ? 'bg-[#0072bc] text-white font-bold' : 'bg-slate-100 text-slate-600'" class="px-3.5 py-1.5 rounded-full text-xs whitespace-nowrap transition" x-text="area">
+                </button>
+            </template>
+        </div>
+
+        <!-- Lưới bàn dạng App -->
+        <div class="flex-1 p-3 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <template x-for="t in filteredTables" :key="t.id">
+                <div @click="selectTable(t)" class="bg-white rounded-2xl p-3 border-2 flex flex-col justify-between items-center text-center shadow-sm active:scale-95 transition h-28"
+                     :class="t.status === 'serving' ? 'border-amber-400 bg-amber-50/40' : 'border-slate-200'">
+                    
+                    <div class="w-full flex justify-between items-center text-[10px] text-slate-400">
+                        <span x-text="t.area"></span>
+                        <span class="w-2 h-2 rounded-full" :class="t.status === 'serving' ? 'bg-amber-500 animate-pulse' : 'bg-slate-300'"></span>
+                    </div>
+
+                    <div>
+                        <i class="fa-solid fa-chair text-xl mb-1" :class="t.status === 'serving' ? 'text-amber-500' : 'text-slate-400'"></i>
+                        <h3 class="font-black text-xs text-slate-800" x-text="t.name"></h3>
+                    </div>
+
+                    <span class="text-[9px] font-bold px-2 py-0.5 rounded-full"
+                          :class="t.status === 'serving' ? 'bg-amber-200 text-amber-900' : 'bg-slate-100 text-slate-500'"
+                          x-text="t.status === 'serving' ? 'Đang có khách' : 'Bàn trống'"></span>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <!-- VIEW 2: GỌI MÓN (ORDERING) -->
+    <div x-show="view === 'ordering'" class="flex-1 flex flex-col overflow-hidden">
+        
+        <!-- Thanh tìm kiếm & Nhóm danh mục -->
+        <div class="bg-white border-b p-2 space-y-2 flex-shrink-0 shadow-sm">
+            <div class="relative">
+                <input type="text" x-model="searchQuery" placeholder="Tìm tên món nước / đồ ăn..." class="w-full pl-8 pr-3 py-1.5 bg-slate-100 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[#0072bc]">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+            </div>
+
+            <div class="flex gap-1.5 overflow-x-auto hide-scrollbar pb-0.5">
+                <template x-for="cat in categories" :key="cat">
+                    <button @click="activeCategory = cat" :class="activeCategory === cat ? 'bg-[#0072bc] text-white font-bold' : 'bg-slate-100 text-slate-600'" class="px-3 py-1 rounded-lg text-xs whitespace-nowrap transition" x-text="cat">
+                    </button>
+                </template>
+            </div>
+        </div>
+
+        <!-- Danh sách món dạng Card điện thoại -->
+        <div class="flex-1 p-2 overflow-y-auto space-y-2">
+            <template x-for="m in filteredMenu" :key="m.id">
+                <div @click="addToCart(m)" class="bg-white p-2.5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between active:bg-blue-50 transition">
+                    <div class="flex items-center gap-2.5">
+                        <template x-if="m.image">
+                            <img :src="m.image" class="w-12 h-12 rounded-xl object-cover border">
+                        </template>
+                        <template x-if="!m.image">
+                            <div class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 border">
+                                <i class="fa-solid fa-mug-hot"></i>
+                            </div>
+                        </template>
+                        <div>
+                            <h4 class="font-bold text-xs text-slate-800" x-text="m.name"></h4>
+                            <span class="text-[10px] text-slate-400" x-text="m.category"></span>
+                            <p class="font-black text-xs text-[#0072bc] mt-0.5" x-text="(m.price || 0).toLocaleString() + 'đ'"></p>
+                        </div>
+                    </div>
+
+                    <!-- Nút bấm thêm -->
+                    <button class="w-8 h-8 rounded-full bg-blue-50 text-[#0072bc] flex items-center justify-center font-bold text-sm shadow-sm active:bg-[#0072bc] active:text-white transition">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                </div>
+            </template>
+        </div>
+
+        <!-- Thanh đáy tóm tắt Order -->
+        <div class="bg-white border-t p-2.5 flex items-center justify-between shadow-lg flex-shrink-0">
+            <div>
+                <p class="text-[10px] text-slate-400">TỔNG MÓN ĐÃ CHỌN:</p>
+                <p class="font-black text-sm text-[#0072bc]" x-text="subTotal().toLocaleString() + 'đ'"></p>
+            </div>
+            <div class="flex gap-2">
+                <button @click="showCartDrawer = true" class="px-3.5 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold">
+                    Xem Đơn (<span x-text="totalCartItems"></span>)
+                </button>
+                <button @click="sendOrderToKitchen()" class="px-5 py-2 bg-[#0072bc] hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-wide shadow flex items-center gap-1.5">
+                    <i class="fa-solid fa-paper-plane"></i> Gửi Bar/Bếp
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= 4. DRAWER CHI TIẾT GIỎ HÀNG (TRƯỢT TỪ DƯỚI LÊN) ================= -->
+    <div x-show="showCartDrawer" class="fixed inset-0 z-50 flex flex-col justify-end bg-slate-900/60 backdrop-blur-sm" style="display: none;">
+        <div class="bg-white w-full max-h-[80vh] rounded-t-3xl p-4 flex flex-col space-y-3 shadow-2xl">
+            <div class="flex justify-between items-center border-b pb-2">
+                <div>
+                    <h3 class="font-black text-sm text-slate-800" x-text="'Chi Tiết Order: ' + selectedTable?.name"></h3>
+                    <p class="text-[10px] text-slate-400">Chỉnh sửa số lượng món cần gọi</p>
+                </div>
+                <button @click="showCartDrawer = false" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Danh sách món đã chọn -->
+            <div class="flex-1 overflow-y-auto space-y-2 max-h-60 pr-1">
+                <template x-if="cartItems.length === 0">
+                    <p class="text-center text-xs text-slate-400 py-6">Chưa có món nào được chọn</p>
+                </template>
+                <template x-for="(item, index) in cartItems" :key="index">
+                    <div class="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-100">
+                        <div class="flex-1 pr-2">
+                            <p class="font-bold text-xs text-slate-800" x-text="item.name"></p>
+                            <p class="text-[10px] text-slate-500" x-text="(item.price * item.qty).toLocaleString() + 'đ'"></p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button @click="updateQty(index, -1)" class="w-6 h-6 rounded-lg bg-white border border-slate-200 text-slate-600 flex items-center justify-center font-black">-</button>
+                            <span class="font-bold text-xs w-4 text-center" x-text="item.qty"></span>
+                            <button @click="updateQty(index, 1)" class="w-6 h-6 rounded-lg bg-white border border-slate-200 text-slate-600 flex items-center justify-center font-black">+</button>
+                            <button @click="removeItem(index)" class="text-red-500 ml-1 p-1"><i class="fa-solid fa-trash text-xs"></i></button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Nút gửi đơn -->
+            <div class="pt-2 border-t flex gap-2">
+                <button @click="showCartDrawer = false" class="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold">Thêm Món Tiếp</button>
+                <button @click="sendOrderToKitchen(); showCartDrawer = false;" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-check"></i> Lưu & Báo Bếp
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= LOGIC JAVASCRIPT ================= -->
+    <script>
+        // Cấu hình Firebase Realtime Database
+        const firebaseConfig = {
+            apiKey: "AIzaSyCjolGY6uh5pY7CHIc0ON6m8qNSz5xJDXM",
+            authDomain: "dbcoffee-bbeaf.firebaseapp.com",
+            databaseURL: "https://dbcoffee-bbeaf-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "dbcoffee-bbeaf",
+            storageBucket: "dbcoffee-bbeaf.firebasestorage.app",
+            messagingSenderId: "118275632803",
+            appId: "1:118275632803:web:459762b6ace8d1c25ed916",
+            measurementId: "G-MHVZ55R50Y"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        function mobileOrderApp() {
+            return {
+                view: 'tables', // 'tables' hoặc 'ordering'
+                currentUser: JSON.parse(localStorage.getItem('cukcuk_user') || 'null'),
+                loginForm: { username: '', pin: '' },
+                staffList: [],
+                
+                tables: [],
+                areas: ['Tầng trệt', 'Sân thượng', 'Phòng máy lạnh'],
+                selectedArea: 'Tất cả',
+                
+                menuItems: [],
+                categories: ['Tất cả', 'Café', 'Trà', 'Nước ngọt', 'Đồ ăn'],
+                activeCategory: 'Tất cả',
+                searchQuery: '',
+                
+                selectedTable: null,
+                tableOrders: {},
+                cartItems: [],
+                showCartDrawer: false,
+
+                init() {
+                    // Lắng nghe dữ liệu Firebase thời gian thực
+                    db.ref('tables').on('value', snap => {
+                        const d = snap.val();
+                        this.tables = d ? Object.keys(d).map(k => ({ id: k, ...d[k] })) : [];
+                    });
+
+                    db.ref('areas').on('value', snap => {
+                        const d = snap.val();
+                        if (d) this.areas = d;
+                    });
+
+                    db.ref('categories').on('value', snap => {
+                        const d = snap.val();
+                        if (d && Array.isArray(d)) this.categories = ['Tất cả', ...d.filter(c => c !== 'Tất cả')];
+                    });
+
+                    db.ref('menu').on('value', snap => {
+                        const d = snap.val();
+                        this.menuItems = d ? Object.keys(d).map(k => ({ id: k, ...d[k] })) : [];
+                    });
+
+                    db.ref('tableOrders').on('value', snap => {
+                        this.tableOrders = snap.val() || {};
+                        if (this.selectedTable) {
+                            this.cartItems = this.tableOrders[this.selectedTable.id] || [];
+                        }
+                    });
+
+                    db.ref('staff').on('value', snap => {
+                        const d = snap.val();
+                        this.staffList = d ? Object.keys(d).map(k => ({ id: k, ...d[k] })) : [];
+                    });
+                },
+
+                login() {
+                    const u = (this.loginForm.username || '').trim().toLowerCase();
+                    const p = String(this.loginForm.pin || '').trim();
+
+                    if (u === 'admin' && p === '1234') {
+                        this.currentUser = { id: 'admin', name: 'Quản Trị Viên', role: 'Quản lý', username: 'admin' };
+                        localStorage.setItem('cukcuk_user', JSON.stringify(this.currentUser));
+                        this.loginForm = { username: '', pin: '' };
+                        return;
+                    }
+
+                    const staff = this.staffList.find(s => String(s.username || '').trim().toLowerCase() === u && String(s.pin || '').trim() === p);
+                    if (staff) {
+                        this.currentUser = { id: staff.id, name: staff.name, role: staff.role || 'Phục vụ', username: staff.username };
+                        localStorage.setItem('cukcuk_user', JSON.stringify(this.currentUser));
+                        this.loginForm = { username: '', pin: '' };
+                    } else {
+                        alert('Tài khoản hoặc mã PIN không đúng!');
+                    }
+                },
+
+                logout() {
+                    this.currentUser = null;
+                    localStorage.removeItem('cukcuk_user');
+                    this.view = 'tables';
+                },
+
+                get filteredTables() {
+                    return this.selectedArea === 'Tất cả' ? this.tables : this.tables.filter(t => t.area === this.selectedArea);
+                },
+
+                get filteredMenu() {
+                    let items = this.menuItems;
+                    if (this.activeCategory !== 'Tất cả') items = items.filter(i => i.category === this.activeCategory);
+                    if (this.searchQuery.trim() !== '') items = items.filter(i => i.name.toLowerCase().includes(this.searchQuery.toLowerCase()));
+                    return items;
+                },
+
+                get totalCartItems() {
+                    return this.cartItems.reduce((sum, i) => sum + Number(i.qty), 0);
+                },
+
+                selectTable(table) {
+                    this.selectedTable = table;
+                    this.cartItems = this.tableOrders[table.id] ? [...this.tableOrders[table.id]] : [];
+                    this.view = 'ordering';
+                },
+
+                addToCart(item) {
+                    let existing = this.cartItems.find(i => i.name === item.name);
+                    if (existing) {
+                        existing.qty++;
+                    } else {
+                        this.cartItems.push({
+                            name: item.name,
+                            price: item.price,
+                            qty: 1,
+                            recipeList: item.recipeList || []
+                        });
+                    }
+                },
+
+                updateQty(index, change) {
+                    this.cartItems[index].qty += change;
+                    if (this.cartItems[index].qty <= 0) this.cartItems.splice(index, 1);
+                },
+
+                removeItem(index) {
+                    this.cartItems.splice(index, 1);
+                },
+
+                subTotal() {
+                    return this.cartItems.reduce((sum, i) => sum + (i.price * i.qty), 0);
+                },
+
+                sendOrderToKitchen() {
+                    if (!this.selectedTable) return;
+                    if (this.cartItems.length === 0) {
+                        alert('Chưa có món nào được chọn!');
+                        return;
+                    }
+
+                    // Cập nhật trạng thái bàn sang "Đang phục vụ"
+                    db.ref('tables/' + this.selectedTable.id).update({ status: 'serving' });
+                    this.selectedTable.status = 'serving';
+
+                    // Đẩy dữ liệu order lên Firebase
+                    db.ref('tableOrders/' + this.selectedTable.id).set(this.cartItems);
+
+                    alert(`Đã gửi Order ${this.selectedTable.name} cho Bar/Bếp thành công!`);
+                    this.view = 'tables';
+                }
+            };
+        }
+    </script>
+</body>
+</html>
