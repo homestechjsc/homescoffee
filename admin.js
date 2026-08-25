@@ -15,23 +15,129 @@ const db = firebase.database();
 function cafeApp() {
     return {
         // ================= NAVIGATION & CHUNG =================
-        currentTab: 'pos',
+        currentTab: 'tables',
         searchQuery: '',
         selectedAreaFilter: 'Tất cả',
         activeCategory: 'Tất cả',
         categories: ['Tất cả', 'Café', 'Trà', 'Nước ngọt', 'Đồ ăn'],
         showCategoryModal: false,
         isEditingCategory: false,
-        selectedShiftToPrint: null,
-        showPrintShiftModal: false,
         categoryOldName: '',
         categoryInputName: '',
+        reportsSubTab: 'overview', // 'overview' | 'items' | 'staff' | 'tables' | 'others'
+        reportStartDate: '',
+        reportEndDate: '',
+        // Lọc danh sách hóa đơn theo khoảng ngày báo cáo
+        get reportFilteredOrders() {
+            let list = [...this.ordersList];
+            if (this.reportStartDate) {
+                const start = new Date(this.reportStartDate + 'T00:00:00').getTime();
+                list = list.filter(o => o.timestamp && new Date(o.timestamp).getTime() >= start);
+            }
+            if (this.reportEndDate) {
+                const end = new Date(this.reportEndDate + 'T23:59:59').getTime();
+                list = list.filter(o => o.timestamp && new Date(o.timestamp).getTime() <= end);
+            }
+            return list;
+        },
+
+        // 1. Báo cáo theo mặt hàng (Số lượng & Doanh thu món)
+        get reportByItems() {
+            const itemMap = {};
+            this.reportFilteredOrders.forEach(order => {
+                (order.items || []).forEach(it => {
+                    if (!itemMap[it.name]) {
+                        itemMap[it.name] = { name: it.name, category: it.category || 'Món khác', qty: 0, revenue: 0 };
+                    }
+                    itemMap[it.name].qty += Number(it.qty || 0);
+                    itemMap[it.name].revenue += (Number(it.price || 0) * Number(it.qty || 0));
+                });
+            });
+            return Object.values(itemMap).sort((a, b) => b.revenue - a.revenue);
+        },
+
+        // 2. Báo cáo doanh thu theo nhân viên
+        get reportByStaff() {
+            const staffMap = {};
+            this.reportFilteredOrders.forEach(order => {
+                const cashier = order.cashier || 'Chưa xác định';
+                if (!staffMap[cashier]) {
+                    staffMap[cashier] = { name: cashier, orderCount: 0, totalRevenue: 0, cashRevenue: 0, bankRevenue: 0 };
+                }
+                staffMap[cashier].orderCount++;
+                staffMap[cashier].totalRevenue += Number(order.total || 0);
+                if (order.paymentMethod === 'Tiền mặt') {
+                    staffMap[cashier].cashRevenue += Number(order.total || 0);
+                } else {
+                    staffMap[cashier].bankRevenue += Number(order.total || 0);
+                }
+            });
+            return Object.values(staffMap).sort((a, b) => b.totalRevenue - a.totalRevenue);
+        },
+
+        // 3. Báo cáo theo bàn / vị trí
+        get reportByTables() {
+            const tableMap = {};
+            this.reportFilteredOrders.forEach(order => {
+                const tblKey = order.table || 'Khách lẻ / Mang về';
+                if (!tableMap[tblKey]) {
+                    tableMap[tblKey] = { name: tblKey, area: order.area || 'Chung', orderCount: 0, revenue: 0 };
+                }
+                tableMap[tblKey].orderCount++;
+                tableMap[tblKey].revenue += Number(order.total || 0);
+            });
+            return Object.values(tableMap).sort((a, b) => b.revenue - a.revenue);
+        },
+
+        // 4. Báo cáo phương thức thanh toán
+        get reportByPaymentMethods() {
+            const payMap = {
+                'Tiền mặt': { name: 'Tiền mặt', count: 0, amount: 0 },
+                'Chuyển khoản': { name: 'Chuyển khoản', count: 0, amount: 0 },
+                'Mã QR': { name: 'Mã QR', count: 0, amount: 0 },
+                'Thẻ': { name: 'Thẻ (POS)', count: 0, amount: 0 }
+            };
+            this.reportFilteredOrders.forEach(o => {
+                const method = o.paymentMethod || 'Tiền mặt';
+                if (!payMap[method]) payMap[method] = { name: method, count: 0, amount: 0 };
+                payMap[method].count++;
+                payMap[method].amount += Number(o.total || 0);
+            });
+            return Object.values(payMap);
+        },
+
+        // 5. Báo cáo khung giờ bán hàng (Giờ vàng)
+        get reportByHourly() {
+            const hours = Array.from({ length: 24 }, (_, i) => ({
+                hour: `${String(i).padStart(2, '0')}:00 - ${String(i).padStart(2, '0')}:59`,
+                orderCount: 0,
+                revenue: 0
+            }));
+            this.reportFilteredOrders.forEach(o => {
+                if (o.timestamp) {
+                    const h = new Date(o.timestamp).getHours();
+                    if (hours[h]) {
+                        hours[h].orderCount++;
+                        hours[h].revenue += Number(o.total || 0);
+                    }
+                }
+            });
+            return hours.filter(h => h.orderCount > 0);
+        },
+        
+        
+        // Quản lý QR Code & Đơn khách tự đặt
         pendingCustomerOrders: [],
-showCustomerOrderModal: false,
-selectedPendingOrder: null,
-showQrModal: false,
-selectedTableForQr: null,
-showAllQrModal: false,
+        showCustomerOrderModal: false,
+        selectedPendingOrder: null,
+        showQrModal: false,
+        selectedTableForQr: null,
+        showAllQrModal: false,
+
+        // Quản lý in kết ca
+        selectedShiftToPrint: null,
+        showPrintShiftModal: false,
+
         tabs: [
             { id: 'pos', name: 'Bán hàng POS', icon: 'fa-solid fa-cash-register' },
             { id: 'tables', name: 'Quản lý Bàn', icon: 'fa-solid fa-chair' },
@@ -40,11 +146,44 @@ showAllQrModal: false,
             { id: 'history_orders', name: 'Lịch sử HĐ', icon: 'fa-solid fa-clock-rotate-left' },
             { id: 'cashflow', name: 'Sổ Quỹ Thu Chi', icon: 'fa-solid fa-wallet' },
             { id: 'staff', name: 'Nhân viên', icon: 'fa-solid fa-users' },
-            { id: 'reports', name: 'Báo cáo', icon: 'fa-solid fa-chart-pie' }
+            { id: 'reports', name: 'Báo cáo', icon: 'fa-solid fa-chart-pie' },
+            { id: 'settings', name: 'Cài đặt', icon: 'fa-solid fa-gear' }
         ],
         areas: ['Tầng trệt', 'Sân thượng', 'Phòng máy lạnh'],
         tables: [],
         menuItems: [],
+
+        // Quản lý Cài đặt & Khuyến mãi
+        settingsSubTab: 'store', // 'store' | 'promotions' | 'logs'
+        systemLogsList: [],
+        storeSettings: {
+    storeName: 'HomesCoffee',
+    address: '123 Đường Số 1, Quận 1, TP.HCM',
+    phone: '0972.023.222',
+    wifiPass: 'homescoffee888',
+    footerMessage: 'Xin cảm ơn quý khách & Hẹn gặp lại!',
+    paperSize: '80mm',
+    showQrPayment: true,
+    bankCode: 'MB',
+    bankAccount: '0972023222',
+    bankAccountName: 'HOMES COFFEE',
+    // Cấu hình Bot Telegram
+    telegramBotToken: '',  // VD: 123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ
+    telegramChatId: '',    // VD: -1001234567890 hoặc ID cá nhân
+    enableTelegramNotify: true
+},
+        promotionsList: [],
+        showPromoModal: false,
+        isEditingPromo: false,
+        promoForm: { 
+    id: null, 
+    name: '', 
+    minOrderValue: 100000, 
+    discountPercent: 10, 
+    startDate: '', // VD: '2026-08-25T00:00'
+    endDate: '',   // VD: '2026-08-31T23:59'
+    isActive: true 
+},
 
         // ================= TÀI KHOẢN & CA LÀM VIỆC =================
         currentUser: JSON.parse(localStorage.getItem('cukcuk_user') || 'null'),
@@ -146,28 +285,41 @@ showAllQrModal: false,
                 const d = snap.val();
                 if (d) this.areas = d;
             });
-
+            db.ref('systemLogs').on('value', snap => {
+    const d = snap.val();
+    this.systemLogsList = d ? Object.keys(d).map(k => ({ id: k, ...d[k] })).reverse() : [];
+});
             db.ref('categories').on('value', snap => {
                 const d = snap.val();
                 if (d && Array.isArray(d)) {
                     this.categories = ['Tất cả', ...d.filter(c => c !== 'Tất cả')];
                 }
             });
+
+            db.ref('settings/store').on('value', snap => {
+                const d = snap.val();
+                if (d) this.storeSettings = { ...this.storeSettings, ...d };
+            });
+
+            db.ref('promotions').on('value', snap => {
+                const d = snap.val();
+                this.promotionsList = d ? Object.keys(d).map(k => ({ id: k, ...d[k] })) : [];
+            });
+
             db.ref('pendingOrders').on('value', snap => {
-    const d = snap.val();
-    if (d) {
-        this.pendingCustomerOrders = Object.keys(d).map(k => ({ key: k, ...d[k] })).filter(o => o.status === 'pending');
-        // Phát âm thanh chuông báo khi có đơn mới
-        if (this.pendingCustomerOrders.length > 0) {
-            try {
-                let audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-                audio.play();
-            } catch(e){}
-        }
-    } else {
-        this.pendingCustomerOrders = [];
-    }
-});
+                const d = snap.val();
+                if (d) {
+                    this.pendingCustomerOrders = Object.keys(d).map(k => ({ key: k, ...d[k] })).filter(o => o.status === 'pending');
+                    if (this.pendingCustomerOrders.length > 0) {
+                        try {
+                            let audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                            audio.play();
+                        } catch(e){}
+                    }
+                } else {
+                    this.pendingCustomerOrders = [];
+                }
+            });
 
             db.ref('suppliers').on('value', snap => {
                 const d = snap.val();
@@ -219,31 +371,31 @@ showAllQrModal: false,
                 this.ordersList = d ? Object.keys(d).map(k => ({ id: k, ...d[k] })) : []; 
             });
         },
-        // ================= kiểm tra quyền theo danh sách vai trò cho phé
-hasPermission(allowedRoles = []) {
-    if (!this.currentUser) return false;
-    if (this.currentUser.role === 'Quản lý' || this.currentUser.username === 'admin') return true;
-    return allowedRoles.includes(this.currentUser.role);
-},
 
-// Chuyển tab có kiểm tra quyền bảo vệ
-switchTab(tabId) {
-    // 1. Các tab chỉ Quản lý mới vào được
-    const managerOnlyTabs = ['reports', 'staff', 'inventory'];
-    if (managerOnlyTabs.includes(tabId) && !this.hasPermission(['Quản lý'])) {
-        alert('Bạn không có quyền truy cập vào mục này! Chỉ Quản lý mới có quyền.');
-        return;
-    }
+        // ================= PHÂN QUYỀN & CHUYỂN TAB =================
+        hasPermission(allowedRoles = []) {
+            if (!this.currentUser) return false;
+            if (this.currentUser.role === 'Quản lý' || this.currentUser.username === 'admin') return true;
+            return allowedRoles.includes(this.currentUser.role);
+        },
 
-    // 2. Tab Thu ngân & Quản lý (Cho phép thêm tab cashflow)
-    const cashierTabs = ['history_orders', 'cashflow'];
-    if (cashierTabs.includes(tabId) && !this.hasPermission(['Quản lý', 'Thu ngân'])) {
-        alert('Chức năng này chỉ dành cho Thu ngân và Quản lý!');
-        return;
-    }
+        switchTab(tabId) {
+            // Các tab chỉ Quản lý mới vào được (Đã thêm tab settings)
+            const managerOnlyTabs = ['reports', 'staff', 'inventory', 'settings'];
+            if (managerOnlyTabs.includes(tabId) && !this.hasPermission(['Quản lý'])) {
+                alert('Bạn không có quyền truy cập vào mục này! Chỉ Quản lý mới có quyền.');
+                return;
+            }
 
-    this.currentTab = tabId;
-},
+            // Tab Thu ngân & Quản lý
+            const cashierTabs = ['history_orders', 'cashflow'];
+            if (cashierTabs.includes(tabId) && !this.hasPermission(['Quản lý', 'Thu ngân'])) {
+                alert('Chức năng này chỉ dành cho Thu ngân và Quản lý!');
+                return;
+            }
+
+            this.currentTab = tabId;
+        },
 
         // ================= XÁC THỰC ĐĂNG NHẬP / ĐĂNG XUẤT =================
         login() {
@@ -255,7 +407,6 @@ switchTab(tabId) {
                 return;
             }
 
-            // 1. Admin mặc định
             if (u === 'admin' && p === '1234') {
                 this.currentUser = { id: 'admin', name: 'Quản Trị Viên', role: 'Quản lý', username: 'admin' };
                 localStorage.setItem('cukcuk_user', JSON.stringify(this.currentUser));
@@ -263,7 +414,6 @@ switchTab(tabId) {
                 return;
             }
 
-            // 2. Tìm trong danh sách nhân viên Firebase
             const list = Array.isArray(this.staffList) ? this.staffList : [];
             const staff = list.find(s => {
                 const sUser = String(s.username || '').trim().toLowerCase();
@@ -338,6 +488,7 @@ switchTab(tabId) {
                 systemExpectedCash: expectedCash
             };
         },
+        
 
         openCloseShiftModalFunc() {
             if (!this.currentShift) { alert('Hiện tại chưa có ca làm việc nào đang mở!'); return; }
@@ -369,9 +520,156 @@ switchTab(tabId) {
             }
 
             alert(`Kết ca thành công!\n- Tiền thực tế: ${actualCash.toLocaleString()}đ\n- Chênh lệch: ${diff >= 0 ? '+' : ''}${diff.toLocaleString()}đ`);
+            const teleShift = `📊 <b>BÁO CÁO KẾT CA LÀM VIỆC</b>\n⏰ Ca: <b>${this.currentShift.shiftName}</b>\n👤 Thu ngân: <b>${this.currentShift.cashier}</b>\n💵 Doanh thu TM: <b>${stats.cashIncome.toLocaleString()}đ</b>\n💳 Chuyển khoản/QR: <b>${stats.bankIncome.toLocaleString()}đ</b>\n📉 Chi tiền mặt: <b>-${stats.expensesCash.toLocaleString()}đ</b>\n💰 Tiền két thực tế: <b>${actualCash.toLocaleString()}đ</b>\n⚠️ Chênh lệch két: <b>${(diff >= 0 ? '+' : '') + diff.toLocaleString()}đ</b>\n⏰ ${new Date().toLocaleString('vi-VN')}`;
+            this.sendTelegramMessage(teleShift);
             this.currentShift = null;
             localStorage.removeItem('cukcuk_shift');
             this.showCloseShiftModal = false;
+        },
+
+        printCurrentShiftReceipt() {
+            const stats = this.shiftStats;
+            const actualCash = Number(this.closeShiftForm.actualCash) || 0;
+            const diff = actualCash - stats.systemExpectedCash;
+
+            this.selectedShiftToPrint = {
+                shiftName: this.currentShift.shiftName,
+                cashier: this.currentShift.cashier,
+                startTime: this.currentShift.startTime,
+                endTime: new Date().toISOString(),
+                initialCash: this.currentShift.initialCash || 0,
+                cashRevenue: stats.cashIncome,
+                bankRevenue: stats.bankIncome,
+                cashExpenses: stats.expensesCash,
+                expectedCash: stats.systemExpectedCash,
+                actualCash: actualCash,
+                difference: diff,
+                ordersCount: stats.ordersCount,
+                closeNote: this.closeShiftForm.note || ''
+            };
+
+            this.showPrintShiftModal = true;
+        },
+
+        reprintShiftReceipt(sh) {
+            this.selectedShiftToPrint = { ...sh };
+            this.showPrintShiftModal = true;
+        },
+
+        executePrint() {
+            window.print();
+        },
+        // Hàm gửi tin nhắn qua Bot Telegram API
+async sendTelegramMessage(text) {
+    if (!this.storeSettings.enableTelegramNotify) return;
+    const token = (this.storeSettings.telegramBotToken || '').trim();
+    const chatId = (this.storeSettings.telegramChatId || '').trim();
+    if (!token || !chatId) return;
+
+    try {
+        const url = `https://api.telegram.org/bot${token}/sendMessage`;
+        await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: chatId,
+                text: text,
+                parse_mode: 'HTML'
+            })
+        });
+    } catch (err) {
+        console.error('Lỗi gửi Telegram:', err);
+    }
+},
+
+// Hàm kiểm tra gửi tin nhắn thử nghiệm (Test Bot)
+async testTelegramBot() {
+    const token = (this.storeSettings.telegramBotToken || '').trim();
+    const chatId = (this.storeSettings.telegramChatId || '').trim();
+    if (!token || !chatId) {
+        alert('Vui lòng nhập đầy đủ Bot Token và Chat ID!');
+        return;
+    }
+    const msg = `🔔 <b>[TEST HOMESCOFFEE POS]</b>\nKết nối Bot Telegram thông báo thành công!\n⏰ Thời gian: ${new Date().toLocaleString('vi-VN')}`;
+    await this.sendTelegramMessage(msg);
+    alert('Đã gửi tin nhắn test! Hãy kiểm tra nhóm Telegram của bạn.');
+},
+
+        // ================= CÀI ĐẶT HỆ THỐNG & KHUYẾN MÃI =================
+        saveStoreSettings() {
+            db.ref('settings/store').set(this.storeSettings);
+            alert('Đã lưu cài đặt thông tin quán & mẫu in bill thành công!');
+        },
+
+        getVietQrUrl(amount = 0, note = '') {
+            if (!this.storeSettings.bankCode || !this.storeSettings.bankAccount) return '';
+            const desc = encodeURIComponent(note || 'Thanh toan HomesCoffee');
+            return `https://img.vietqr.io/image/${this.storeSettings.bankCode}-${this.storeSettings.bankAccount}-compact2.png?amount=${amount}&addInfo=${desc}&accountName=${encodeURIComponent(this.storeSettings.bankAccountName)}`;
+        },
+
+        openPromoModal() {
+    this.isEditingPromo = false;
+    const nowStr = new Date().toISOString().slice(0, 16);
+    this.promoForm = { 
+        id: null, 
+        name: '', 
+        minOrderValue: 100000, 
+        discountPercent: 10, 
+        startDate: nowStr, 
+        endDate: '', 
+        isActive: true 
+    };
+    this.showPromoModal = true;
+},
+
+openEditPromoModal(p) {
+    this.isEditingPromo = true;
+    this.promoForm = { 
+        id: p.id,
+        name: p.name || '',
+        minOrderValue: p.minOrderValue || 0,
+        discountPercent: p.discountPercent || 0,
+        startDate: p.startDate || '',
+        endDate: p.endDate || '',
+        isActive: p.isActive !== false && p.isActive !== 'false'
+    };
+    this.showPromoModal = true;
+},
+
+savePromotion() {
+    if (!this.promoForm.name.trim()) { alert('Vui lòng nhập tên chương trình!'); return; }
+    
+    // Kiểm tra nếu có nhập cả ngày bắt đầu và kết thúc
+    if (this.promoForm.startDate && this.promoForm.endDate) {
+        if (new Date(this.promoForm.startDate) > new Date(this.promoForm.endDate)) {
+            alert('Thời gian bắt đầu không được lớn hơn thời gian kết thúc!');
+            return;
+        }
+    }
+
+    const payload = {
+        name: this.promoForm.name.trim(),
+        minOrderValue: Number(this.promoForm.minOrderValue) || 0,
+        discountPercent: Number(this.promoForm.discountPercent) || 0,
+        startDate: this.promoForm.startDate || '',
+        endDate: this.promoForm.endDate || '',
+        isActive: this.promoForm.isActive
+    };
+
+    if (this.isEditingPromo) {
+        db.ref('promotions/' + this.promoForm.id).update(payload);
+    } else {
+        db.ref('promotions').push(payload);
+    }
+
+    alert('Đã lưu chương trình khuyến mãi thành công!');
+    this.showPromoModal = false;
+},
+
+        deletePromotion(id) {
+            if (confirm('Xóa chương trình khuyến mãi này?')) {
+                db.ref('promotions/' + id).remove();
+            }
         },
 
         // ================= QUẢN LÝ NHÂN VIÊN =================
@@ -423,7 +721,40 @@ switchTab(tabId) {
         deleteStaff(id) { 
             if (confirm('Bạn có chắc muốn xóa nhân viên này?')) db.ref('staff/' + id).remove(); 
         },
+        logActivity(actionType, description) {
+        const logPayload = {
+        action: actionType,
+        description: description,
+        actorName: this.currentUser ? this.currentUser.name : 'Hệ thống',
+        actorUsername: this.currentUser ? this.currentUser.username : 'system',
+        actorRole: this.currentUser ? this.currentUser.role : 'Quản lý',
+        timestamp: new Date().toISOString()
+    };
+    db.ref('systemLogs').push(logPayload);
 
+    // Bắn cảnh báo tức thì về Telegram
+    const teleAlert = `⚠️ <b>CẢNH BÁO CAN THIỆP HỆ THỐNG</b>\n🚨 Hành động: <b>${actionType}</b>\n👤 Người thực hiện: <b>${logPayload.actorName}</b> (${logPayload.actorRole})\n📝 Chi tiết: ${description}\n⏰ ${new Date().toLocaleString('vi-VN')}`;
+    this.sendTelegramMessage(teleAlert);
+},
+
+// Hàm xóa toàn bộ hoặc từng log (Dành cho Quản lý)
+clearAllLogs() {
+    if (!this.hasPermission(['Quản lý'])) {
+        alert('Chỉ tài khoản Quản lý mới có quyền xóa nhật ký!');
+        return;
+    }
+    if (confirm('CẢNH BÁO: Bạn có chắc chắn muốn xóa TOÀN BỘ nhật ký thao tác hệ thống? Hành động này không thể hoàn tác!')) {
+        db.ref('systemLogs').remove();
+        alert('Đã dọn sạch toàn bộ nhật ký thao tác!');
+    }
+},
+
+deleteSingleLog(id) {
+    if (!this.hasPermission(['Quản lý'])) return;
+    if (confirm('Xóa dòng nhật ký này?')) {
+        db.ref('systemLogs/' + id).remove();
+    }
+},
         // ================= POS & ORDER =================
         get filteredTables() {
             return this.selectedAreaFilter === 'Tất cả' ? this.tables : this.tables.filter(t => t.area === this.selectedAreaFilter);
@@ -456,7 +787,7 @@ switchTab(tabId) {
             this.tableOrders[this.selectedTable.id] = [...this.currentOrder.items];
             db.ref('tableOrders/' + this.selectedTable.id).set(this.currentOrder.items);
         },
-
+        
         updateQty(index, change) {
             this.currentOrder.items[index].qty += change;
             if (this.currentOrder.items[index].qty <= 0) this.currentOrder.items.splice(index, 1);
@@ -476,25 +807,58 @@ switchTab(tabId) {
             return this.currentOrder.items.reduce((sum, i) => sum + (i.price * i.qty), 0); 
         },
 
+        // Getter tự động tìm khuyến mãi tốt nhất phù hợp với đơn
+        get matchedPromotion() {
+    if (!this.promotionsList || this.promotionsList.length === 0) return null;
+    const sub = this.subTotal();
+    if (sub <= 0) return null;
+
+    const now = new Date().getTime();
+
+    // Lọc theo: Trạng thái bật + Đơn tối thiểu + Khoảng thời gian hiệu lực
+    const eligiblePromos = this.promotionsList.filter(p => {
+        const active = (p.isActive === true || p.isActive === 'true');
+        const minVal = Number(p.minOrderValue) || 0;
+        
+        // Kiểm tra thời gian bắt đầu (nếu có cài)
+        const startValid = p.startDate ? (now >= new Date(p.startDate).getTime()) : true;
+        // Kiểm tra thời gian kết thúc (nếu có cài)
+        const endValid = p.endDate ? (now <= new Date(p.endDate).getTime()) : true;
+
+        return active && (sub >= minVal) && startValid && endValid;
+    });
+
+    if (eligiblePromos.length === 0) return null;
+
+    // Ưu tiên chọn chương trình có mức % giảm cao nhất
+    return eligiblePromos.sort((a, b) => Number(b.discountPercent) - Number(a.discountPercent))[0];
+},
+
+        // Tự động tính chiết khấu (Ưu tiên Khuyến mãi tự động trước)
         get discountCalculated() {
-            let sub = this.subTotal();
-            if (this.discountType === 'percent') {
-                return (sub * (Number(this.discountPercent) || 0)) / 100;
-            } else {
-                return Math.min(sub, Number(this.discountAmount) || 0);
-            }
-        },
+    const sub = this.subTotal();
+    if (sub <= 0) return 0;
 
-        finalTotal() {
-            let sub = this.subTotal();
-            let total = sub - this.discountCalculated + (Number(this.surcharge) || 0);
-            return Math.max(0, total);
-        },
+    // Ưu tiên 1: Tự động ăn theo Khuyến mãi hệ thống
+    if (this.matchedPromotion) {
+        const percent = Number(this.matchedPromotion.discountPercent) || 0;
+        return (sub * percent) / 100;
+    }
 
-        get returnChange() {
-            if (!this.customerGivenMoney || this.customerGivenMoney <= 0) return 0;
-            return Math.max(0, this.customerGivenMoney - this.finalTotal());
-        },
+    // Ưu tiên 2: Giảm giá nhập tay nếu không có khuyến mãi
+    if (this.discountType === 'percent') {
+        return (sub * (Number(this.discountPercent) || 0)) / 100;
+    } else {
+        return Math.min(sub, Number(this.discountAmount) || 0);
+    }
+},
+
+       // 3. Tính tổng tiền thanh toán cuối cùng
+finalTotal() {
+    const sub = this.subTotal();
+    const total = sub - this.discountCalculated + (Number(this.surcharge) || 0);
+    return Math.max(0, total);
+},
 
         saveTableOrder() {
             if (!this.selectedTable) { alert('Vui lòng chọn bàn trước!'); return; }
@@ -503,23 +867,38 @@ switchTab(tabId) {
             db.ref('tables/' + this.selectedTable.id).update({ status: 'serving' });
             this.selectedTable.status = 'serving';
             db.ref('tableOrders/' + this.selectedTable.id).set(this.currentOrder.items);
-            alert(`Đã lưu order cho ${this.selectedTable.name}!`);
+            
+            const savedTableName = this.selectedTable.name;
+            alert(`Đã lưu order cho ${savedTableName}!`);
+
+            // Tự động chuyển về tab Sơ đồ bàn & dọn sạch order đang hiển thị
+            this.selectedTable = null;
+            this.currentOrder.items = [];
+            this.currentTab = 'tables';
         },
 
         cancelOrder() {
-            if (!this.selectedTable) { alert('Vui lòng chọn bàn cần hủy order!'); return; }
-            if (this.currentOrder.items.length === 0) { alert('Bàn này hiện chưa có món nào trong order!'); return; }
+    if (!this.selectedTable) { alert('Vui lòng chọn bàn cần hủy order!'); return; }
+    if (this.currentOrder.items.length === 0) { alert('Bàn này hiện chưa có món nào trong order!'); return; }
 
-            if (!confirm(`Bạn có chắc chắn muốn HỦY TOÀN BỘ ORDER của ${this.selectedTable.name}?`)) return;
+    if (!confirm(`Bạn có chắc chắn muốn HỦY TOÀN BỘ ORDER của ${this.selectedTable.name}?`)) return;
 
-            db.ref('tableOrders/' + this.selectedTable.id).remove();
-            db.ref('tables/' + this.selectedTable.id).update({ status: 'empty' });
+    const itemsSummary = this.currentOrder.items.map(i => `${i.qty}x ${i.name}`).join(', ');
+    const tableName = this.selectedTable.name;
 
-            delete this.tableOrders[this.selectedTable.id];
-            this.currentOrder.items = [];
-            this.selectedTable.status = 'empty';
-            alert(`Đã hủy order của ${this.selectedTable.name}!`);
-        },
+    db.ref('tableOrders/' + this.selectedTable.id).remove();
+    db.ref('tables/' + this.selectedTable.id).update({ status: 'empty' });
+
+    delete this.tableOrders[this.selectedTable.id];
+    this.currentOrder.items = [];
+    this.selectedTable.status = 'empty';
+    this.currentTab = 'tables';
+
+    // GHI LOG
+    this.logActivity('HỦY ORDER BÀN', `Hủy toàn bộ món đang gọi tại ${tableName}. Món hủy gồm: [${itemsSummary}]`);
+
+    alert(`Đã hủy order của ${tableName}!`);
+},
 
         openPaymentModal() {
             if (!this.selectedTable || this.currentOrder.items.length === 0) {
@@ -542,7 +921,7 @@ switchTab(tabId) {
             let finalAmt = this.finalTotal();
             let discVal = this.discountCalculated;
 
-            // Trừ kho tự động
+            // 1. Trừ kho tự động
             let exportedItems = [];
             this.currentOrder.items.forEach(cartItem => {
                 if (cartItem.recipeList && Array.isArray(cartItem.recipeList)) {
@@ -575,10 +954,11 @@ switchTab(tabId) {
                 });
             }
 
-            db.ref('orders').push({
+            // 2. Tạo đối tượng hóa đơn lưu trữ & in ấn
+            const orderData = {
                 table: this.selectedTable.name,
                 area: this.selectedTable.area,
-                items: this.currentOrder.items,
+                items: [...this.currentOrder.items],
                 subTotal: sub,
                 discount: discVal,
                 total: finalAmt,
@@ -586,19 +966,34 @@ switchTab(tabId) {
                 note: this.orderNote,
                 cashier: this.currentUser ? this.currentUser.name : 'Thu ngân',
                 timestamp: new Date().toISOString()
-            });
+            };
 
+            // 3. Ghi đơn hàng lên Firebase & Reset bàn trên DB
+            db.ref('orders').push(orderData);
             db.ref('tables/' + this.selectedTable.id).update({ status: 'empty' });
             db.ref('tableOrders/' + this.selectedTable.id).remove();
 
-            alert(`Thanh toán thành công ${finalAmt.toLocaleString()}đ cho ${this.selectedTable.name}!`);
+            // 4. Gửi thông báo Bot Telegram
+            const itemsText = orderData.items.map(i => `• ${i.qty}x ${i.name}`).join('\n');
+            const teleMsg = `💰 <b>ĐƠN HÀNG MỚI HOÀN TẤT</b>\n🏠 Quán: <b>${this.storeSettings.storeName}</b>\n🪑 Bàn: <b>${orderData.table}</b> (${orderData.area})\n💵 Tổng tiền: <b>${finalAmt.toLocaleString()}đ</b> (${orderData.paymentMethod})\n👤 Thu ngân: ${orderData.cashier}\n📋 Chi tiết:\n${itemsText}\n⏰ ${new Date().toLocaleString('vi-VN')}`;
+            this.sendTelegramMessage(teleMsg);
 
+            // 5. Gán dữ liệu sang hóa đơn in & Mở modal hóa đơn
+            this.selectedBillToView = { ...orderData };
+            this.showBillDetailModal = true;
+            this.showPaymentModal = false;
+
+            // 6. Dọn dẹp trạng thái bàn hiện tại
             this.selectedTable.status = 'empty';
             this.selectedTable = null;
             this.currentOrder.items = [];
-            this.showPaymentModal = false;
-        },
+            this.currentTab = 'tables';
 
+            // 7. TỰ ĐỘNG IN HÓA ĐƠN THEO KHUNG IN RIÊNG (Không in cả trang web)
+            setTimeout(() => {
+                this.printReceipt('final-bill-print-area');
+            }, 300);
+        },
         printTemporaryBill() {
             if (!this.selectedTable || this.currentOrder.items.length === 0) { alert('Không có dữ liệu hóa đơn!'); return; }
             this.showBillModal = true;
@@ -713,40 +1108,7 @@ switchTab(tabId) {
             alert(`Đã tách món sang ${targetTbl.name}!`);
             this.showSplitModal = false;
         },
-        // Hàm in phiếu kết ca trực tiếp từ Modal Kết Ca
-        printCurrentShiftReceipt() {
-            const stats = this.shiftStats;
-            const actualCash = Number(this.closeShiftForm.actualCash) || 0;
-            const diff = actualCash - stats.systemExpectedCash;
 
-            this.selectedShiftToPrint = {
-                shiftName: this.currentShift.shiftName,
-                cashier: this.currentShift.cashier,
-                startTime: this.currentShift.startTime,
-                endTime: new Date().toISOString(),
-                initialCash: this.currentShift.initialCash || 0,
-                cashRevenue: stats.cashIncome,
-                bankRevenue: stats.bankIncome,
-                cashExpenses: stats.expensesCash,
-                expectedCash: stats.systemExpectedCash,
-                actualCash: actualCash,
-                difference: diff,
-                ordersCount: stats.ordersCount,
-                closeNote: this.closeShiftForm.note || ''
-            };
-
-            this.showPrintShiftModal = true;
-        },
-
-        // Hàm xem và in lại phiếu từ danh sách lịch sử ca
-        reprintShiftReceipt(sh) {
-            this.selectedShiftToPrint = { ...sh };
-            this.showPrintShiftModal = true;
-        },
-
-        executePrint() {
-            window.print();
-        },
         // ================= QUẢN LÝ BÀN, KHU VỰC, DANH MỤC, MÓN =================
         openTableModal() { this.isEditingTable = false; this.tableForm = { id: null, name: '', area: this.areas[0] || 'Tầng trệt', status: 'empty' }; this.showTableModal = true; },
         openEditTableModal(t) { this.isEditingTable = true; this.tableForm = { ...t }; this.showTableModal = true; },
@@ -871,48 +1233,188 @@ switchTab(tabId) {
             };
             reader.readAsArrayBuffer(file);
         },
-        // Tạo URL gọi món cho bàn
-getTableQrUrl(tableId) {
-    // Tự động nhận diện URL hiện tại và trỏ chính xác về file khachorder.html cùng thư mục
-    const currentUrl = window.location.href.split('?')[0].split('#')[0];
-    const basePath = currentUrl.substring(0, currentUrl.lastIndexOf('/'));
-    return `${basePath}/khachorder.html?tableId=${encodeURIComponent(tableId)}`;
-},
 
-// Mở modal xem QR của 1 bàn
-openTableQrModal(table) {
-    this.selectedTableForQr = table;
-    this.showQrModal = true;
-},
+        // ================= QR CODE & DUYỆT ĐƠN KHÁCH TỰ ĐẶT =================
+        getTableQrUrl(table) {
+            const currentUrl = window.location.href.split('?')[0].split('#')[0];
+            const basePath = currentUrl.substring(0, currentUrl.lastIndexOf('/'));
+            
+            let tableParam = '';
+            if (typeof table === 'object' && table !== null) {
+                tableParam = table.id || (table.name ? table.name.replace(/\s+/g, '_') : '');
+            } else {
+                tableParam = String(table || '');
+            }
 
-// In trang mã QR
-printQrCode() {
-    window.print();
-},
-        // ================= XỬ LÝ LỊCH SỬ HÓA ĐƠN (XEM, SỬA, XÓA, IN) =================
+            return `${basePath}/khachorder.html?tableId=${encodeURIComponent(tableParam)}`;
+        },
+
+        openTableQrModal(table) {
+            this.selectedTableForQr = table;
+            this.showQrModal = true;
+        },
+
+        printQrCode() {
+            window.print();
+        },
+
+        acceptCustomerOrder(order) {
+            const targetTableId = order.tableId;
+
+            db.ref('tables/' + targetTableId).update({ status: 'serving' });
+
+            let currentTableItems = this.tableOrders[targetTableId] || [];
+            order.items.forEach(newItem => {
+                let exist = currentTableItems.find(i => i.name === newItem.name && !i.isGift);
+                if (exist) {
+                    exist.qty = Number(exist.qty) + Number(newItem.qty);
+                } else {
+                    currentTableItems.push({ ...newItem });
+                }
+            });
+
+            db.ref('tableOrders/' + targetTableId).set(currentTableItems);
+            db.ref('pendingOrders/' + targetTableId).update({ status: 'serving' });
+
+            setTimeout(() => {
+                db.ref('pendingOrders/' + targetTableId).remove();
+            }, 15000);
+
+            alert(`Đã tiếp nhận đơn của ${order.tableName}! Món đã được lưu vào bàn.`);
+            this.showCustomerOrderModal = false;
+        },
+
+        rejectCustomerOrder(order) {
+            if (confirm(`Hủy yêu cầu gọi món của ${order.tableName}?`)) {
+                db.ref('pendingOrders/' + order.tableId).remove();
+            }
+        },
+
+        // ================= XỬ LÝ LỊCH SỬ HÓA ĐƠN =================
         viewBillDetail(b) {
             this.selectedBillToView = b;
             this.showBillDetailModal = true;
         },
 
-        printReprintBill() {
-            window.print();
-        },
-
-        // Hàm xóa hóa đơn (Sửa lỗi ReferenceError)
-        deleteOrderHistory(orderId) {
-            if (!this.hasPermission(['Quản lý'])) {
-                alert('Chỉ tài khoản Quản lý mới có quyền xóa hóa đơn!');
+        printReceipt(areaId) {
+            const el = document.getElementById(areaId);
+            if (!el) {
+                window.print();
                 return;
             }
-            if (confirm('Bạn có chắc chắn muốn xóa hóa đơn này khỏi hệ thống?')) {
-                db.ref('orders/' + orderId).remove();
-                alert('Đã xóa hóa đơn thành công!');
-                this.showBillDetailModal = false;
+
+            const billContent = el.innerHTML;
+            const paperWidth = this.storeSettings?.paperSize === '58mm' ? '58mm' : '80mm';
+
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'fixed';
+            iframe.style.right = '0';
+            iframe.style.bottom = '0';
+            iframe.style.width = '0';
+            iframe.style.height = '0';
+            iframe.style.border = '0';
+            document.body.appendChild(iframe);
+
+            const doc = iframe.contentWindow.document;
+            doc.open();
+            doc.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>In Phiếu</title>
+                    <script src="https://cdn.tailwindcss.com"></script>
+                    <style>
+                        @page { size: auto; margin: 0; }
+                        body {
+                            font-family: monospace, sans-serif;
+                            width: ${paperWidth};
+                            margin: 0 auto;
+                            padding: 6px;
+                            background: #fff;
+                            color: #000;
+                        }
+                        img { 
+                            max-width: 100%; 
+                            height: auto; 
+                            display: block; 
+                            margin: 0 auto; 
+                        }
+                    </style>
+                </head>
+                <body class="font-mono text-xs">
+                    ${billContent}
+                </body>
+                </html>
+            `);
+            doc.close();
+
+            // Hàm kích hoạt in an toàn sau khi load xong ảnh
+            const triggerPrint = () => {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+                setTimeout(() => {
+                    if (document.body.contains(iframe)) {
+                        document.body.removeChild(iframe);
+                    }
+                }, 1000);
+            };
+
+            // Đợi tất cả hình ảnh (bao gồm cả mã VietQR) tải xong hoàn toàn
+            const images = doc.images;
+            if (images.length > 0) {
+                let loadedCount = 0;
+                const total = images.length;
+                const checkDone = () => {
+                    loadedCount++;
+                    if (loadedCount >= total) triggerPrint();
+                };
+
+                for (let i = 0; i < total; i++) {
+                    if (images[i].complete) {
+                        checkDone();
+                    } else {
+                        images[i].onload = checkDone;
+                        images[i].onerror = checkDone; // Tiếp tục in nếu mạng lỗi ảnh
+                    }
+                }
+
+                // Dự phòng trường hợp mạng chậm tối đa 1.5 giây
+                setTimeout(() => {
+                    if (loadedCount < total) triggerPrint();
+                }, 1500);
+            } else {
+                setTimeout(triggerPrint, 300);
             }
         },
 
-        // Hàm mở modal sửa hóa đơn
+// 2. Mở modal xem phiếu tạm tính
+printTemporaryBill() {
+    if (!this.selectedTable || this.currentOrder.items.length === 0) {
+        alert('Không có dữ liệu hóa đơn!');
+        return;
+    }
+    this.showBillModal = true;
+},
+
+        deleteOrderHistory(orderId) {
+    if (!this.hasPermission(['Quản lý'])) {
+        alert('Chỉ tài khoản Quản lý mới có quyền xóa hóa đơn!');
+        return;
+    }
+    if (confirm('Bạn có chắc chắn muốn xóa hóa đơn này khỏi hệ thống?')) {
+        const order = this.ordersList.find(o => o.id === orderId);
+        const orderInfo = order ? `Bàn: ${order.table}, Tổng tiền: ${Number(order.total || 0).toLocaleString()}đ` : `Mã: ${orderId}`;
+        
+        db.ref('orders/' + orderId).remove();
+        
+        // GHI LOG
+        this.logActivity('XÓA HÓA ĐƠN', `Xóa vĩnh viễn hóa đơn (${orderInfo})`);
+        
+        alert('Đã xóa hóa đơn thành công!');
+        this.showBillDetailModal = false;
+    }
+},
+
         openEditBillModal(b) {
             if (!this.hasPermission(['Quản lý'])) {
                 alert('Chỉ tài khoản Quản lý mới có quyền sửa hóa đơn!');
@@ -929,29 +1431,70 @@ printQrCode() {
             };
             this.showEditBillModal = true;
         },
-        
 
-        // Hàm lưu hóa đơn sau khi sửa
         saveEditedBill() {
-            if (!this.editingBillForm.id) return;
-            
-            db.ref('orders/' + this.editingBillForm.id).update({
-                table: this.editingBillForm.table,
-                paymentMethod: this.editingBillForm.paymentMethod,
-                total: Number(this.editingBillForm.total) || 0,
-                note: this.editingBillForm.note || ''
-            });
+    if (!this.editingBillForm.id) return;
+    
+    db.ref('orders/' + this.editingBillForm.id).update({
+        table: this.editingBillForm.table,
+        paymentMethod: this.editingBillForm.paymentMethod,
+        total: Number(this.editingBillForm.total) || 0,
+        note: this.editingBillForm.note || ''
+    });
 
-            alert('Đã cập nhật hóa đơn thành công!');
-            this.showEditBillModal = false;
-            
-            if (this.selectedBillToView && this.selectedBillToView.id === this.editingBillForm.id) {
-                this.selectedBillToView.table = this.editingBillForm.table;
-                this.selectedBillToView.paymentMethod = this.editingBillForm.paymentMethod;
-                this.selectedBillToView.total = Number(this.editingBillForm.total) || 0;
-                this.selectedBillToView.note = this.editingBillForm.note || '';
+    // GHI LOG
+    this.logActivity('SỬA HÓA ĐƠN', `Chỉnh sửa hóa đơn mã [${this.editingBillForm.id}] -> Bàn: ${this.editingBillForm.table}, PT: ${this.editingBillForm.paymentMethod}, Tiền mới: ${Number(this.editingBillForm.total).toLocaleString()}đ`);
+
+    alert('Đã cập nhật hóa đơn thành công!');
+    this.showEditBillModal = false;
+    
+    if (this.selectedBillToView && this.selectedBillToView.id === this.editingBillForm.id) {
+        this.selectedBillToView.table = this.editingBillForm.table;
+        this.selectedBillToView.paymentMethod = this.editingBillForm.paymentMethod;
+        this.selectedBillToView.total = Number(this.editingBillForm.total) || 0;
+        this.selectedBillToView.note = this.editingBillForm.note || '';
+    }
+},
+
+        get filteredOrdersList() {
+            let list = [...this.ordersList].reverse();
+
+            if (this.currentUser && this.currentUser.role === 'Thu ngân') {
+                const todayStr = new Date().toLocaleDateString('en-CA');
+                list = list.filter(o => {
+                    const orderDate = o.timestamp ? new Date(o.timestamp).toLocaleDateString('en-CA') : '';
+                    const isToday = orderDate === todayStr;
+                    const isMyOrder = o.cashier === this.currentUser.name || o.cashier === this.currentUser.username;
+                    return isToday && isMyOrder;
+                });
             }
+
+            if (this.historyFilterKeyword.trim() !== '') {
+                const kw = this.historyFilterKeyword.toLowerCase().trim();
+                list = list.filter(o => {
+                    const matchTable = (o.table || '').toLowerCase().includes(kw);
+                    const matchId = (o.id || '').toLowerCase().includes(kw);
+                    const matchNote = (o.note || '').toLowerCase().includes(kw);
+                    const matchCashier = (o.cashier || '').toLowerCase().includes(kw);
+                    const matchItems = (o.items || []).some(item => (item.name || '').toLowerCase().includes(kw));
+                    return matchTable || matchId || matchNote || matchCashier || matchItems;
+                });
+            }
+
+            if (this.historyFilterDate) {
+                list = list.filter(o => {
+                    const orderDate = o.timestamp ? new Date(o.timestamp).toLocaleDateString('en-CA') : '';
+                    return orderDate === this.historyFilterDate;
+                });
+            }
+
+            if (this.historyFilterPayment !== 'Tất cả') {
+                list = list.filter(o => o.paymentMethod === this.historyFilterPayment);
+            }
+
+            return list;
         },
+
         // ================= KHO, ĐƠN VỊ TÍNH, NHÀ CUNG CẤP =================
         openUnitModal() { this.newUnitName = ''; this.showUnitModal = true; },
         saveUnit() {
@@ -1003,44 +1546,7 @@ printQrCode() {
             alert('Nhập kho thành công!');
             this.importOrder = { supplier: '', note: '', items: [] };
         },
-        // HÀM TIẾP NHẬN ĐƠN KHÁCH VÀ CHUYỂN SANG ĐANG PHỤC VỤ
-acceptCustomerOrder(order) {
-    const targetTableId = order.tableId;
 
-    // 1. Cập nhật trạng thái bàn sang "Đang phục vụ"
-    db.ref('tables/' + targetTableId).update({ status: 'serving' });
-
-    // 2. Gộp món vào Order của bàn
-    let currentTableItems = this.tableOrders[targetTableId] || [];
-    order.items.forEach(newItem => {
-        let exist = currentTableItems.find(i => i.name === newItem.name && !i.isGift);
-        if (exist) {
-            exist.qty = Number(exist.qty) + Number(newItem.qty);
-        } else {
-            currentTableItems.push({ ...newItem });
-        }
-    });
-
-    db.ref('tableOrders/' + targetTableId).set(currentTableItems);
-
-    // 3. Đổi trạng thái đơn của khách sang "serving" để màn hình khách hiện "Đang được phục vụ"
-    db.ref('pendingOrders/' + targetTableId).update({ status: 'serving' });
-
-    // Tự động xóa thông báo sau 15 giây
-    setTimeout(() => {
-        db.ref('pendingOrders/' + targetTableId).remove();
-    }, 15000);
-
-    alert(`Đã tiếp nhận đơn của ${order.tableName}! Món đã được lưu vào bàn.`);
-    this.showCustomerOrderModal = false;
-},
-
-// TỪ CHỐI ĐƠN
-rejectCustomerOrder(order) {
-    if (confirm(`Hủy yêu cầu gọi món của ${order.tableName}?`)) {
-        db.ref('pendingOrders/' + order.tableId).remove();
-    }
-},
         openSupplierModal() { this.isEditingSupplier = false; this.supplierForm = { id: null, name: '', phone: '', address: '', note: '' }; this.showSupplierModal = true; },
         openEditSupplierModal(s) { this.isEditingSupplier = true; this.supplierForm = { ...s }; this.showSupplierModal = true; },
         saveSupplier() {
@@ -1075,160 +1581,130 @@ rejectCustomerOrder(order) {
             });
         },
 
-        // ================= LỊCH SỬ HÓA ĐƠN =================
-        // Getter lọc lịch sử hóa đơn (Có phân quyền Thu ngân theo ngày)
-get filteredOrdersList() {
-    let list = [...this.ordersList].reverse(); // Đưa đơn mới nhất lên đầu
-
-    // 1. Phân quyền: Nếu là 'Thu ngân', chỉ lọc đơn của chính mình bán trong ngày hôm nay
-    if (this.currentUser && this.currentUser.role === 'Thu ngân') {
-        const todayStr = new Date().toLocaleDateString('en-CA'); // Lấy ngày YYYY-MM-DD theo giờ hiện tại
-        list = list.filter(o => {
-            const orderDate = o.timestamp ? new Date(o.timestamp).toLocaleDateString('en-CA') : '';
-            const isToday = orderDate === todayStr;
-            const isMyOrder = o.cashier === this.currentUser.name || o.cashier === this.currentUser.username;
-            return isToday && isMyOrder;
-        });
-    }
-
-    // 2. Bộ lọc tìm kiếm theo từ khóa (Bàn, mã đơn, món, ghi chú)
-    if (this.historyFilterKeyword.trim() !== '') {
-        const kw = this.historyFilterKeyword.toLowerCase().trim();
-        list = list.filter(o => {
-            const matchTable = (o.table || '').toLowerCase().includes(kw);
-            const matchId = (o.id || '').toLowerCase().includes(kw);
-            const matchNote = (o.note || '').toLowerCase().includes(kw);
-            const matchCashier = (o.cashier || '').toLowerCase().includes(kw);
-            const matchItems = (o.items || []).some(item => (item.name || '').toLowerCase().includes(kw));
-            return matchTable || matchId || matchNote || matchCashier || matchItems;
-        });
-    }
-
-    // 3. Bộ lọc theo ngày chọn (áp dụng cho Quản lý)
-    if (this.historyFilterDate) {
-        list = list.filter(o => {
-            const orderDate = o.timestamp ? new Date(o.timestamp).toLocaleDateString('en-CA') : '';
-            return orderDate === this.historyFilterDate;
-        });
-    }
-
-    // 4. Bộ lọc phương thức thanh toán
-    if (this.historyFilterPayment !== 'Tất cả') {
-        list = list.filter(o => o.paymentMethod === this.historyFilterPayment);
-    }
-
-    return list;
-},
-
         // ================= SỔ QUỸ THU CHI =================
-        get totalAutoPosIncome() {
-    return this.filteredCashFlowList
-        .filter(c => c.type === 'THU' && c.isPosOrder)
-        .reduce((sum, o) => sum + (Number(o.amount) || 0), 0);
-},
-
-get totalManualIncome() {
-    return this.filteredCashFlowList
-        .filter(c => c.type === 'THU' && !c.isPosOrder)
-        .reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
-},
-
-get totalExpenses() {
-    return this.filteredCashFlowList
-        .filter(c => c.type === 'CHI')
-        .reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
-},
-
-get netCashBalance() {
-    return (this.totalAutoPosIncome + this.totalManualIncome) - this.totalExpenses;
-},
-
         get filteredCashFlowList() {
-    // 1. Chuyển đổi danh sách đơn hàng POS thành định dạng Phiếu Thu
-    const posIncomeRows = (this.ordersList || []).map(order => ({
-        id: 'POS_' + order.id,
-        type: 'THU',
-        category: 'Thu tiền bán hàng POS',
-        amount: Number(order.total) || 0,
-        recipient: order.table ? `Bàn: ${order.table}` : 'Khách lẻ POS',
-        paymentMethod: order.paymentMethod || 'Tiền mặt',
-        note: order.note ? `Hóa đơn POS (${order.note})` : 'Hóa đơn bán hàng POS tự động',
-        timestamp: order.timestamp || new Date().toISOString(),
-        cashier: order.cashier || 'Thu ngân',
-        created_by: order.cashier || 'Thu ngân',
-        isPosOrder: true
-    }));
+            const posIncomeRows = (this.ordersList || []).map(order => ({
+                id: 'POS_' + order.id,
+                type: 'THU',
+                category: 'Thu tiền bán hàng POS',
+                amount: Number(order.total) || 0,
+                recipient: order.table ? `Bàn: ${order.table}` : 'Khách lẻ POS',
+                paymentMethod: order.paymentMethod || 'Tiền mặt',
+                note: order.note ? `Hóa đơn POS (${order.note})` : 'Hóa đơn bán hàng POS tự động',
+                timestamp: order.timestamp || new Date().toISOString(),
+                cashier: order.cashier || 'Thu ngân',
+                created_by: order.cashier || 'Thu ngân',
+                isPosOrder: true
+            }));
 
-    // 2. Gộp phiếu thu/chi thủ công và đơn POS, sắp xếp theo thời gian mới nhất
-    let list = [...(this.cashFlowList || []), ...posIncomeRows].sort((a, b) => {
-        return new Date(b.timestamp) - new Date(a.timestamp);
-    });
+            let list = [...(this.cashFlowList || []), ...posIncomeRows].sort((a, b) => {
+                return new Date(b.timestamp) - new Date(a.timestamp);
+            });
 
-    // 3. Phân quyền: Nếu là 'Thu ngân', chỉ lấy giao dịch của chính mình trong ngày hôm nay
-    if (this.currentUser && this.currentUser.role === 'Thu ngân') {
-        const todayStr = new Date().toLocaleDateString('en-CA'); // Lấy ngày YYYY-MM-DD theo giờ hiện tại
-        list = list.filter(c => {
-            const flowDate = c.timestamp ? new Date(c.timestamp).toLocaleDateString('en-CA') : '';
-            const isToday = flowDate === todayStr;
-            const isMyFlow = (c.created_by === this.currentUser.name || c.created_by === this.currentUser.username ||
-                              c.cashier === this.currentUser.name || c.cashier === this.currentUser.username);
-            return isToday && isMyFlow;
-        });
-    }
+            if (this.currentUser && this.currentUser.role === 'Thu ngân') {
+                const todayStr = new Date().toLocaleDateString('en-CA');
+                list = list.filter(c => {
+                    const flowDate = c.timestamp ? new Date(c.timestamp).toLocaleDateString('en-CA') : '';
+                    const isToday = flowDate === todayStr;
+                    const isMyFlow = (c.created_by === this.currentUser.name || c.created_by === this.currentUser.username ||
+                                      c.cashier === this.currentUser.name || c.cashier === this.currentUser.username);
+                    return isToday && isMyFlow;
+                });
+            }
 
-    // 4. Áp dụng các bộ lọc thủ công (Loại phiếu, Nhóm chi phí, Ngày chọn)
-    if (this.cashFlowFilterType && this.cashFlowFilterType !== 'Tất cả') {
-        list = list.filter(c => c.type === this.cashFlowFilterType);
-    }
-    if (this.cashFlowFilterCategory && this.cashFlowFilterCategory !== 'Tất cả') {
-        list = list.filter(c => c.category === this.cashFlowFilterCategory);
-    }
-    if (this.cashFlowFilterDate) {
-        list = list.filter(c => {
-            const flowDate = c.timestamp ? new Date(c.timestamp).toLocaleDateString('en-CA') : '';
-            return flowDate === this.cashFlowFilterDate;
-        });
-    }
+            if (this.cashFlowFilterType && this.cashFlowFilterType !== 'Tất cả') {
+                list = list.filter(c => c.type === this.cashFlowFilterType);
+            }
+            if (this.cashFlowFilterCategory && this.cashFlowFilterCategory !== 'Tất cả') {
+                list = list.filter(c => c.category === this.cashFlowFilterCategory);
+            }
+            if (this.cashFlowFilterDate) {
+                list = list.filter(c => {
+                    const flowDate = c.timestamp ? new Date(c.timestamp).toLocaleDateString('en-CA') : '';
+                    return flowDate === this.cashFlowFilterDate;
+                });
+            }
 
-    return list;
-},
+            return list;
+        },
+
+        get totalAutoPosIncome() {
+            return this.filteredCashFlowList
+                .filter(c => c.type === 'THU' && c.isPosOrder)
+                .reduce((sum, o) => sum + (Number(o.amount) || 0), 0);
+        },
+
+        get totalManualIncome() {
+            return this.filteredCashFlowList
+                .filter(c => c.type === 'THU' && !c.isPosOrder)
+                .reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+        },
+
+        get totalExpenses() {
+            return this.filteredCashFlowList
+                .filter(c => c.type === 'CHI')
+                .reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+        },
+
+        get netCashBalance() {
+            return (this.totalAutoPosIncome + this.totalManualIncome) - this.totalExpenses;
+        },
 
         openCashFlowModal(type = 'CHI') {
             this.isEditingCashFlow = false;
             this.cashFlowForm = { id: null, type, category: type === 'CHI' ? this.expenseCategories[0] : this.incomeCategories[1], amount: 0, recipient: '', note: '', paymentMethod: 'Tiền mặt' };
             this.showCashFlowModal = true;
         },
-        openEditCashFlowModal(c) { this.isEditingCashFlow = true; this.cashFlowForm = { ...c }; this.showCashFlowModal = true; },
+        
+        openEditCashFlowModal(c) { 
+            this.isEditingCashFlow = true; 
+            this.cashFlowForm = { ...c }; 
+            this.showCashFlowModal = true; 
+        },
+
         saveCashFlow() {
-    if (!this.cashFlowForm.amount || Number(this.cashFlowForm.amount) <= 0) {
-        alert('Vui lòng nhập số tiền hợp lệ (> 0)!');
-        return;
-    }
-    if (!this.cashFlowForm.category) {
-        alert('Vui lòng chọn loại chi phí / thu nhập!');
-        return;
+            if (!this.cashFlowForm.amount || Number(this.cashFlowForm.amount) <= 0) {
+                alert('Vui lòng nhập số tiền hợp lệ (> 0)!');
+                return;
+            }
+            if (!this.cashFlowForm.category) {
+                alert('Vui lòng chọn loại chi phí / thu nhập!');
+                return;
+            }
+
+            let payload = {
+                type: this.cashFlowForm.type,
+                category: this.cashFlowForm.category,
+                amount: Number(this.cashFlowForm.amount),
+                recipient: this.cashFlowForm.recipient.trim() || '---',
+                note: this.cashFlowForm.note.trim() || '',
+                paymentMethod: this.cashFlowForm.paymentMethod || 'Tiền mặt',
+                created_by: this.currentUser ? this.currentUser.name : 'Thu ngân',
+                timestamp: this.isEditingCashFlow ? this.cashFlowForm.timestamp : new Date().toISOString()
+            };
+
+            if (this.isEditingCashFlow) {
+                db.ref('cashFlow/' + this.cashFlowForm.id).update(payload);
+            } else {
+                db.ref('cashFlow').push(payload);
+            }
+
+            alert(`Đã lưu phiếu ${payload.type === 'CHI' ? 'chi' : 'thu'} thành công!`);
+            this.showCashFlowModal = false;
+        },
+
+        deleteCashFlow(id) { 
+    if (confirm('Xóa phiếu này?')) {
+        const flow = this.cashFlowList.find(c => c.id === id);
+        const flowInfo = flow ? `${flow.type} - ${flow.category} - ${Number(flow.amount || 0).toLocaleString()}đ` : id;
+        
+        db.ref('cashFlow/' + id).remove();
+        
+        // GHI LOG
+        this.logActivity('XÓA THU CHI', `Xóa phiếu sổ quỹ: (${flowInfo})`);
     }
 
-    let payload = {
-        type: this.cashFlowForm.type,
-        category: this.cashFlowForm.category,
-        amount: Number(this.cashFlowForm.amount),
-        recipient: this.cashFlowForm.recipient.trim() || '---',
-        note: this.cashFlowForm.note.trim() || '',
-        paymentMethod: this.cashFlowForm.paymentMethod || 'Tiền mặt',
-        created_by: this.currentUser ? this.currentUser.name : 'Thu ngân',
-        timestamp: this.isEditingCashFlow ? this.cashFlowForm.timestamp : new Date().toISOString()
+        }
     };
-
-    if (this.isEditingCashFlow) {
-        db.ref('cashFlow/' + this.cashFlowForm.id).update(payload);
-    } else {
-        db.ref('cashFlow').push(payload);
-    }
-
-    alert(`Đã lưu phiếu ${payload.type === 'CHI' ? 'chi' : 'thu'} thành công!`);
-    this.showCashFlowModal = false;
-},
-        deleteCashFlow(id) { if (confirm('Xóa phiếu này?')) db.ref('cashFlow/' + id).remove(); }
-    };
+    
 }
