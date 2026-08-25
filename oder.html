@@ -33,7 +33,7 @@
 </head>
 <body class="bg-slate-100 text-slate-800 antialiased font-sans h-screen overflow-hidden flex flex-col" x-data="mobileOrderApp()" x-init="init()">
 
-    <!-- ================= 1. MÀN HÌNH ĐĂNG NHẬP (NẾU CHƯA ĐĂNG NHẬP) ================= -->
+    <!-- ================= 1. MÀN HÌNH ĐĂNG NHẬP ================= -->
     <div x-show="!currentUser" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/90 p-4">
         <div class="bg-white w-full max-w-xs rounded-3xl p-6 shadow-2xl space-y-4">
             <div class="text-center">
@@ -75,7 +75,7 @@
 
         <div class="flex items-center gap-2">
             <!-- Giỏ hàng nổi khi đang gọi món -->
-            <button x-show="view === 'ordering'" @click="showCartDrawer = true" class="relative px-3 py-1.5 bg-amber-500 hover:bg-amber-600 rounded-xl text-xs font-black flex items-center gap-1 shadow">
+            <button x-show="view === 'ordering'" @click="showCartDrawer = true" class="relative px-3 py-1.5 bg-amber-500 hover:bg-amber-600 rounded-xl text-xs font-black flex items-center gap-1.5 shadow active:scale-95 transition">
                 <i class="fa-solid fa-cart-shopping"></i>
                 <span x-text="totalCartItems"></span>
             </button>
@@ -144,30 +144,51 @@
             </div>
         </div>
 
-        <!-- Danh sách món dạng Card điện thoại -->
+        <!-- Danh sách món có nút Tăng/Giảm trực tiếp -->
         <div class="flex-1 p-2 overflow-y-auto space-y-2">
             <template x-for="m in filteredMenu" :key="m.id">
-                <div @click="addToCart(m)" class="bg-white p-2.5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between active:bg-blue-50 transition">
-                    <div class="flex items-center gap-2.5">
+                <div class="bg-white p-2.5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between transition"
+                     :class="getItemQty(m.name) > 0 ? 'border-blue-300 bg-blue-50/20' : ''">
+                    
+                    <!-- Thông tin món -->
+                    <div class="flex items-center gap-2.5 flex-1 pr-2">
                         <template x-if="m.image">
-                            <img :src="m.image" class="w-12 h-12 rounded-xl object-cover border">
+                            <img :src="m.image" class="w-12 h-12 rounded-xl object-cover border flex-shrink-0">
                         </template>
                         <template x-if="!m.image">
-                            <div class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 border">
+                            <div class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 border flex-shrink-0">
                                 <i class="fa-solid fa-mug-hot"></i>
                             </div>
                         </template>
-                        <div>
-                            <h4 class="font-bold text-xs text-slate-800" x-text="m.name"></h4>
+                        <div class="min-w-0">
+                            <h4 class="font-bold text-xs text-slate-800 truncate" x-text="m.name"></h4>
                             <span class="text-[10px] text-slate-400" x-text="m.category"></span>
                             <p class="font-black text-xs text-[#0072bc] mt-0.5" x-text="(m.price || 0).toLocaleString() + 'đ'"></p>
                         </div>
                     </div>
 
-                    <!-- Nút bấm thêm -->
-                    <button class="w-8 h-8 rounded-full bg-blue-50 text-[#0072bc] flex items-center justify-center font-bold text-sm shadow-sm active:bg-[#0072bc] active:text-white transition">
-                        <i class="fa-solid fa-plus"></i>
-                    </button>
+                    <!-- BỘ TĂNG GIẢM SỐ LƯỢNG TRỰC TIẾP TRÊN CARD -->
+                    <div class="flex-shrink-0">
+                        <!-- Khi món chưa có trong giỏ: Hiện nút + -->
+                        <template x-if="getItemQty(m.name) === 0">
+                            <button @click="addToCart(m)" class="w-8 h-8 rounded-full bg-blue-50 text-[#0072bc] border border-blue-200 flex items-center justify-center font-bold text-sm shadow-sm active:bg-[#0072bc] active:text-white transition">
+                                <i class="fa-solid fa-plus"></i>
+                            </button>
+                        </template>
+
+                        <!-- Khi món đã có trong giỏ: Hiện bộ nút [-] [SL] [+] -->
+                        <template x-if="getItemQty(m.name) > 0">
+                            <div class="flex items-center bg-white border border-blue-200 rounded-full p-0.5 shadow-sm">
+                                <button @click="changeQtyDirect(m, -1)" class="w-7 h-7 rounded-full bg-slate-100 active:bg-slate-200 text-slate-700 flex items-center justify-center font-black text-xs transition">
+                                    <i class="fa-solid fa-minus text-[10px]"></i>
+                                </button>
+                                <span class="w-7 text-center font-black text-xs text-[#0072bc]" x-text="getItemQty(m.name)"></span>
+                                <button @click="changeQtyDirect(m, 1)" class="w-7 h-7 rounded-full bg-[#0072bc] active:bg-blue-700 text-white flex items-center justify-center font-black text-xs transition shadow-sm">
+                                    <i class="fa-solid fa-plus text-[10px]"></i>
+                                </button>
+                            </div>
+                        </template>
+                    </div>
                 </div>
             </template>
         </div>
@@ -179,17 +200,17 @@
                 <p class="font-black text-sm text-[#0072bc]" x-text="subTotal().toLocaleString() + 'đ'"></p>
             </div>
             <div class="flex gap-2">
-                <button @click="showCartDrawer = true" class="px-3.5 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold">
+                <button @click="showCartDrawer = true" class="px-3.5 py-2 bg-slate-100 active:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition">
                     Xem Đơn (<span x-text="totalCartItems"></span>)
                 </button>
-                <button @click="sendOrderToKitchen()" class="px-5 py-2 bg-[#0072bc] hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-wide shadow flex items-center gap-1.5">
-                    <i class="fa-solid fa-paper-plane"></i> Gửi Bar/Bếp
+                <button @click="sendOrderToKitchen()" class="px-5 py-2 bg-[#0072bc] active:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-wide shadow flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-paper-plane"></i> Báo Bar/Bếp
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- ================= 4. DRAWER CHI TIẾT GIỎ HÀNG (TRƯỢT TỪ DƯỚI LÊN) ================= -->
+    <!-- ================= 4. DRAWER CHI TIẾT GIỎ HÀNG ================= -->
     <div x-show="showCartDrawer" class="fixed inset-0 z-50 flex flex-col justify-end bg-slate-900/60 backdrop-blur-sm" style="display: none;">
         <div class="bg-white w-full max-h-[80vh] rounded-t-3xl p-4 flex flex-col space-y-3 shadow-2xl">
             <div class="flex justify-between items-center border-b pb-2">
@@ -202,7 +223,7 @@
                 </button>
             </div>
 
-            <!-- Danh sách món đã chọn -->
+            <!-- Danh sách món đã chọn trong drawer -->
             <div class="flex-1 overflow-y-auto space-y-2 max-h-60 pr-1">
                 <template x-if="cartItems.length === 0">
                     <p class="text-center text-xs text-slate-400 py-6">Chưa có món nào được chọn</p>
@@ -226,7 +247,7 @@
             <!-- Nút gửi đơn -->
             <div class="pt-2 border-t flex gap-2">
                 <button @click="showCartDrawer = false" class="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold">Thêm Món Tiếp</button>
-                <button @click="sendOrderToKitchen(); showCartDrawer = false;" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow flex items-center justify-center gap-1.5">
+                <button @click="sendOrderToKitchen(); showCartDrawer = false;" class="flex-1 py-2.5 bg-emerald-600 active:bg-emerald-700 text-white rounded-xl text-xs font-black shadow flex items-center justify-center gap-1.5 transition">
                     <i class="fa-solid fa-check"></i> Lưu & Báo Bếp
                 </button>
             </div>
@@ -235,7 +256,6 @@
 
     <!-- ================= LOGIC JAVASCRIPT ================= -->
     <script>
-        // Cấu hình Firebase Realtime Database
         const firebaseConfig = {
             apiKey: "AIzaSyCjolGY6uh5pY7CHIc0ON6m8qNSz5xJDXM",
             authDomain: "dbcoffee-bbeaf.firebaseapp.com",
@@ -252,7 +272,7 @@
 
         function mobileOrderApp() {
             return {
-                view: 'tables', // 'tables' hoặc 'ordering'
+                view: 'tables', // Mặc định mở Sơ đồ bàn
                 currentUser: JSON.parse(localStorage.getItem('cukcuk_user') || 'null'),
                 loginForm: { username: '', pin: '' },
                 staffList: [],
@@ -272,7 +292,6 @@
                 showCartDrawer: false,
 
                 init() {
-                    // Lắng nghe dữ liệu Firebase thời gian thực
                     db.ref('tables').on('value', snap => {
                         const d = snap.val();
                         this.tables = d ? Object.keys(d).map(k => ({ id: k, ...d[k] })) : [];
@@ -350,10 +369,17 @@
 
                 selectTable(table) {
                     this.selectedTable = table;
-                    this.cartItems = this.tableOrders[table.id] ? [...this.tableOrders[table.id]] : [];
+                    this.cartItems = this.tableOrders[table.id] ? JSON.parse(JSON.stringify(this.tableOrders[table.id])) : [];
                     this.view = 'ordering';
                 },
 
+                // Lấy số lượng hiện tại của món theo tên
+                getItemQty(itemName) {
+                    const found = this.cartItems.find(i => i.name === itemName);
+                    return found ? Number(found.qty) : 0;
+                },
+
+                // Thêm hoặc tăng số lượng món
                 addToCart(item) {
                     let existing = this.cartItems.find(i => i.name === item.name);
                     if (existing) {
@@ -365,6 +391,19 @@
                             qty: 1,
                             recipeList: item.recipeList || []
                         });
+                    }
+                },
+
+                // Thay đổi số lượng trực tiếp từ Card món
+                changeQtyDirect(item, change) {
+                    let existing = this.cartItems.find(i => i.name === item.name);
+                    if (existing) {
+                        existing.qty += change;
+                        if (existing.qty <= 0) {
+                            this.cartItems = this.cartItems.filter(i => i.name !== item.name);
+                        }
+                    } else if (change > 0) {
+                        this.addToCart(item);
                     }
                 },
 
@@ -396,6 +435,10 @@
                     db.ref('tableOrders/' + this.selectedTable.id).set(this.cartItems);
 
                     alert(`Đã gửi Order ${this.selectedTable.name} cho Bar/Bếp thành công!`);
+                    
+                    // Tự động giải phóng dữ liệu và chuyển về Sơ đồ bàn
+                    this.selectedTable = null;
+                    this.cartItems = [];
                     this.view = 'tables';
                 }
             };
