@@ -84,6 +84,12 @@
     <button x-show="hasPermission(['Quản lý'])" @click="switchTab('staff')" :class="currentTab === 'staff' ? 'bg-[#005a96] text-white shadow-inner font-bold' : 'hover:bg-blue-600 text-blue-100'" class="px-3 py-1.5 rounded text-xs flex items-center gap-1.5 transition">
         <i class="fa-solid fa-users"></i> Nhân viên
     </button>
+    <button x-show="hasPermission(['Quản lý'])" 
+        @click="switchTab('settings')" 
+        :class="currentTab === 'settings' ? 'bg-[#005a96] text-white shadow-inner font-bold' : 'hover:bg-blue-600 text-blue-100'" 
+        class="px-3 py-1.5 rounded text-xs flex items-center gap-1.5 transition">
+    <i class="fa-solid fa-gear"></i> Cài đặt
+</button>
 </div>
 <!-- ================= ĐẶT NÚT CHUÔNG TẠI ĐÂY ================= -->
         <button @click="showCustomerOrderModal = true" class="relative px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow">
@@ -265,38 +271,43 @@
                 </div>
 
                 <!-- Tính tiền & Nút thu tiền -->
-<div class="border-t border-slate-200 bg-slate-50 p-2.5 space-y-2 flex-shrink-0">
+<!-- Tính tiền & Nút thu tiền (Cột phải POS) -->
+<div class="border-t border-slate-200 bg-slate-50 p-2.5 space-y-1.5 flex-shrink-0">
     <div class="flex justify-between text-xs text-slate-600">
         <span>Tiền hàng:</span>
         <span class="font-bold text-slate-800" x-text="subTotal().toLocaleString() + 'đ'"></span>
     </div>
 
+    <!-- Dòng hiển thị khuyến mãi tự động nếu có -->
+    <template x-if="matchedPromotion">
+        <div class="flex justify-between text-xs text-rose-600 font-bold bg-rose-50 p-1 rounded border border-rose-200">
+            <span x-text="'KM (' + matchedPromotion.name + ' -' + matchedPromotion.discountPercent + '%):'"></span>
+            <span x-text="'-' + discountCalculated.toLocaleString() + 'đ'"></span>
+        </div>
+    </template>
+
     <div class="flex justify-between items-center text-sm font-black text-slate-900 border-t border-slate-200 pt-1.5">
         <span>TỔNG TIỀN:</span>
-        <span class="text-[#0072bc] text-base font-black" x-text="subTotal().toLocaleString() + 'đ'"></span>
+        <span class="text-[#0072bc] text-base font-black" x-text="finalTotal().toLocaleString() + 'đ'"></span>
     </div>
 
-    <!-- Hàng nút: Lưu Bàn - In Tạm Tính - Hủy Order -->
+    <!-- Hàng nút tác vụ -->
     <div class="grid grid-cols-3 gap-1.5 pt-1">
-        <button @click="saveTableOrder()" class="py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded text-xs flex items-center justify-center gap-1 shadow-sm transition" title="Lưu order gửi bếp/bar">
+        <button @click="saveTableOrder()" class="py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded text-xs flex items-center justify-center gap-1 shadow-sm transition">
             <i class="fa-solid fa-floppy-disk"></i> Lưu Bàn
         </button>
-        <button @click="printTemporaryBill()" class="py-2 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded text-xs flex items-center justify-center gap-1 shadow-sm transition" title="In phiếu tạm tính cho khách">
+        <button @click="printTemporaryBill()" class="py-2 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded text-xs flex items-center justify-center gap-1 shadow-sm transition">
             <i class="fa-solid fa-print"></i> In Tạm Tính
         </button>
-        <button @click="cancelOrder()" class="py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded text-xs flex items-center justify-center gap-1 shadow-sm transition" title="Hủy toàn bộ order bàn này">
+        <button @click="cancelOrder()" class="py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded text-xs flex items-center justify-center gap-1 shadow-sm transition">
             <i class="fa-solid fa-trash-can"></i> Hủy Order
         </button>
     </div>
+
     <template x-if="hasPermission(['Quản lý', 'Thu ngân'])">
         <button @click="openPaymentModal()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded text-sm flex items-center justify-center gap-2 shadow transition">
             <i class="fa-solid fa-money-bill-wave"></i> TÍNH TIỀN / THU TIỀN (F9)
         </button>
-    </template>
-    <template x-if="!hasPermission(['Quản lý', 'Thu ngân'])">
-        <div class="p-2 bg-amber-50 border border-amber-200 rounded text-center text-xs text-amber-800 font-bold">
-            <i class="fa-solid fa-circle-info mr-1"></i> Nhân viên Phục vụ/Pha chế chỉ được phép Order & Lưu bàn
-        </div>
     </template>
 </div>
             </div>
@@ -777,24 +788,254 @@
 
 </div>
 
-        <!-- TAB 5: BÁO CÁO -->
-        <div x-show="currentTab === 'reports'" class="flex-1 bg-white rounded border border-slate-300 p-4 overflow-y-auto space-y-4">
-            <h2 class="font-extrabold text-slate-800 text-base border-b pb-3">Tổng quan Doanh Thu & Báo Cáo</h2>
-            <div class="grid grid-cols-3 gap-4">
-                <div class="bg-blue-50 border border-blue-200 p-4 rounded text-center">
-                    <p class="text-xs text-blue-700 font-bold uppercase">Doanh thu hôm nay</p>
-                    <p class="text-2xl font-black text-[#0072bc] mt-1" x-text="totalRevenue.toLocaleString() + 'đ'"></p>
-                </div>
-                <div class="bg-slate-50 border border-slate-200 p-4 rounded text-center">
-                    <p class="text-xs text-slate-600 font-bold uppercase">Tổng đơn hoàn tất</p>
-                    <p class="text-2xl font-black text-slate-800 mt-1" x-text="totalOrdersCount + ' đơn'"></p>
-                </div>
-                <div class="bg-emerald-50 border border-emerald-200 p-4 rounded text-center">
-                    <p class="text-xs text-emerald-700 font-bold uppercase">Lợi nhuận ước tính</p>
-                    <p class="text-2xl font-black text-emerald-600 mt-1" x-text="(totalRevenue * 0.4).toLocaleString() + 'đ'"></p>
-                </div>
+        <!-- TAB 5: BÁO CÁO DOANH THU & PHÂN TÍCH ĐA NĂNG -->
+<div x-show="currentTab === 'reports'" class="flex-1 bg-white rounded border border-slate-300 p-4 overflow-y-auto space-y-4">
+    
+    <!-- Header: Tiêu đề & Sub-menu Báo cáo -->
+    <div class="flex flex-wrap justify-between items-center border-b pb-3 gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+            <h2 class="font-extrabold text-slate-800 text-base flex items-center gap-1.5 mr-2">
+                <i class="fa-solid fa-chart-pie text-[#0072bc]"></i> Trung Tâm Báo Cáo
+            </h2>
+            
+            <!-- SUB-MENU CHUYỂN CÁC LOẠI BÁO CÁO -->
+            <div class="flex flex-wrap bg-slate-100 p-1 rounded-lg border text-xs font-bold gap-1">
+                <button @click="reportsSubTab = 'overview'" :class="reportsSubTab === 'overview' ? 'bg-[#0072bc] text-white shadow' : 'text-slate-600 hover:text-slate-900'" class="px-3 py-1 rounded transition">
+                    <i class="fa-solid fa-chart-line"></i> Báo Cáo Tổng Hợp
+                </button>
+                <button @click="reportsSubTab = 'items'" :class="reportsSubTab === 'items' ? 'bg-[#0072bc] text-white shadow' : 'text-slate-600 hover:text-slate-900'" class="px-3 py-1 rounded transition">
+                    <i class="fa-solid fa-mug-hot"></i> Báo Cáo Mặt Hàng
+                </button>
+                <button @click="reportsSubTab = 'staff'" :class="reportsSubTab === 'staff' ? 'bg-[#0072bc] text-white shadow' : 'text-slate-600 hover:text-slate-900'" class="px-3 py-1 rounded transition">
+                    <i class="fa-solid fa-user-tie"></i> Báo Cáo Nhân Viên
+                </button>
+                <button @click="reportsSubTab = 'tables'" :class="reportsSubTab === 'tables' ? 'bg-[#0072bc] text-white shadow' : 'text-slate-600 hover:text-slate-900'" class="px-3 py-1 rounded transition">
+                    <i class="fa-solid fa-chair"></i> Báo Cáo Theo Bàn
+                </button>
+                <button @click="reportsSubTab = 'others'" :class="reportsSubTab === 'others' ? 'bg-[#0072bc] text-white shadow' : 'text-slate-600 hover:text-slate-900'" class="px-3 py-1 rounded transition">
+                    <i class="fa-solid fa-cubes"></i> Khung Giờ & Thanh Toán
+                </button>
             </div>
         </div>
+
+        <!-- Bộ Lọc Khoảng Thời Gian -->
+        <div class="flex items-center gap-2 text-xs bg-slate-50 p-1.5 rounded-lg border">
+            <span class="font-bold text-slate-500">Từ:</span>
+            <input type="date" x-model="reportStartDate" class="px-2 py-1 bg-white border rounded text-xs font-semibold focus:outline-none">
+            <span class="font-bold text-slate-500">Đến:</span>
+            <input type="date" x-model="reportEndDate" class="px-2 py-1 bg-white border rounded text-xs font-semibold focus:outline-none">
+            <button @click="reportStartDate = ''; reportEndDate = ''" class="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded font-bold transition" title="Xem tất cả">
+                <i class="fa-solid fa-rotate-left"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- ================= 1. SUB-TAB: BÁO CÁO TỔNG HỢP ================= -->
+    <div x-show="reportsSubTab === 'overview'" class="space-y-4">
+        <!-- 4 Card Tổng Quan -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="bg-blue-50/80 border border-blue-200 p-4 rounded-xl">
+                <p class="text-[11px] text-blue-700 font-bold uppercase">Doanh Thu Thu Được</p>
+                <p class="text-2xl font-black text-[#0072bc] mt-1" x-text="reportFilteredOrders.reduce((sum, o) => sum + (o.total || 0), 0).toLocaleString() + 'đ'"></p>
+                <span class="text-[10px] text-blue-500 font-medium" x-text="'Khớp ' + reportFilteredOrders.length + ' hóa đơn hoàn tất'"></span>
+            </div>
+            <div class="bg-emerald-50/80 border border-emerald-200 p-4 rounded-xl">
+                <p class="text-[11px] text-emerald-700 font-bold uppercase">Giá Trị Đơn Trung Bình</p>
+                <p class="text-2xl font-black text-emerald-600 mt-1" x-text="reportFilteredOrders.length > 0 ? Math.round(reportFilteredOrders.reduce((s, o) => s + (o.total || 0), 0) / reportFilteredOrders.length).toLocaleString() + 'đ' : '0đ'"></p>
+                <span class="text-[10px] text-emerald-600 font-medium">Doanh thu / số lượt đơn</span>
+            </div>
+            <div class="bg-amber-50/80 border border-amber-200 p-4 rounded-xl">
+                <p class="text-[11px] text-amber-800 font-bold uppercase">Tổng Món Đã Bán</p>
+                <p class="text-2xl font-black text-amber-700 mt-1" x-text="reportByItems.reduce((s, i) => s + i.qty, 0) + ' ly/món'"></p>
+                <span class="text-[10px] text-amber-600 font-medium" x-text="'Qua ' + reportByItems.length + ' loại đồ uống/món'"></span>
+            </div>
+            <div class="bg-purple-50/80 border border-purple-200 p-4 rounded-xl">
+                <p class="text-[11px] text-purple-700 font-bold uppercase">Tổng Chiết Khấu / KM</p>
+                <p class="text-2xl font-black text-purple-600 mt-1" x-text="reportFilteredOrders.reduce((sum, o) => sum + (o.discount || 0), 0).toLocaleString() + 'đ'"></p>
+                <span class="text-[10px] text-purple-500 font-medium">Giảm giá & khuyến mãi</span>
+            </div>
+        </div>
+
+        <!-- Bảng tóm tắt nhanh Top 5 món bán chạy nhất -->
+        <div class="border rounded-xl p-3 bg-slate-50 space-y-2">
+            <h4 class="font-bold text-xs uppercase text-slate-700 flex items-center gap-1.5">
+                <i class="fa-solid fa-fire text-rose-500"></i> Top Mặt Hàng Bán Chạy Nhất Trong Kỳ
+            </h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2">
+                <template x-for="(topItem, tIdx) in reportByItems.slice(0, 5)" :key="topItem.name">
+                    <div class="bg-white p-2.5 rounded-lg border border-slate-200 shadow-sm flex flex-col justify-between">
+                        <div>
+                            <span class="text-[10px] font-black px-1.5 py-0.5 rounded bg-blue-100 text-[#0072bc]" x-text="'#' + (tIdx + 1)"></span>
+                            <p class="font-bold text-xs text-slate-800 mt-1 truncate" x-text="topItem.name"></p>
+                        </div>
+                        <div class="flex justify-between items-end mt-2 pt-1 border-t text-xs">
+                            <span class="font-black text-[#0072bc]" x-text="topItem.qty + ' ly'"></span>
+                            <span class="text-[11px] text-slate-500 font-semibold" x-text="topItem.revenue.toLocaleString() + 'đ'"></span>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= 2. SUB-TAB: BÁO CÁO THEO MẶT HÀNG ================= -->
+    <div x-show="reportsSubTab === 'items'" class="space-y-4">
+        <div class="border rounded-lg overflow-hidden">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead class="bg-slate-100 uppercase text-slate-700 font-bold border-b">
+                    <tr>
+                        <th class="p-2.5 w-12 text-center">STT</th>
+                        <th class="p-2.5">Tên Mặt Hàng / Món</th>
+                        <th class="p-2.5 text-center w-32">Số Lượng Bán</th>
+                        <th class="p-2.5 text-right w-44">Tổng Doanh Số</th>
+                        <th class="p-2.5 text-right w-36">Tỷ Trọng (%)</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    <template x-if="reportByItems.length === 0">
+                        <tr><td colspan="5" class="p-8 text-center text-slate-400">Không có dữ liệu bán hàng trong khoảng thời gian này.</td></tr>
+                    </template>
+                    <template x-for="(it, idx) in reportByItems" :key="it.name">
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="p-2.5 text-center font-bold text-slate-400" x-text="idx + 1"></td>
+                            <td class="p-2.5 font-bold text-slate-800" x-text="it.name"></td>
+                            <td class="p-2.5 text-center font-black text-slate-700 bg-slate-50/50" x-text="it.qty"></td>
+                            <td class="p-2.5 text-right font-black text-[#0072bc]" x-text="it.revenue.toLocaleString() + 'đ'"></td>
+                            <td class="p-2.5 text-right font-mono text-slate-500" 
+                                x-text="(reportFilteredOrders.reduce((s, o) => s + (o.total || 0), 0) > 0 ? ((it.revenue / reportFilteredOrders.reduce((s, o) => s + (o.total || 0), 0)) * 100).toFixed(1) : 0) + '%'"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ================= 3. SUB-TAB: BÁO CÁO NHÂN VIÊN ================= -->
+    <div x-show="reportsSubTab === 'staff'" class="space-y-4">
+        <div class="border rounded-lg overflow-hidden">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead class="bg-slate-100 uppercase text-slate-700 font-bold border-b">
+                    <tr>
+                        <th class="p-2.5">Nhân Viên / Thu Ngân</th>
+                        <th class="p-2.5 text-center w-28">Số Lượng Đơn</th>
+                        <th class="p-2.5 text-right">Thu Tiền Mặt</th>
+                        <th class="p-2.5 text-right">Thu CK / QR / Thẻ</th>
+                        <th class="p-2.5 text-right w-44 font-black">Tổng Doanh Thu</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    <template x-if="reportByStaff.length === 0">
+                        <tr><td colspan="5" class="p-8 text-center text-slate-400">Chưa có dữ liệu ca bán hàng.</td></tr>
+                    </template>
+                    <template x-for="st in reportByStaff" :key="st.name">
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="p-2.5 font-bold text-slate-800 flex items-center gap-2">
+                                <div class="w-6 h-6 rounded-full bg-blue-100 text-[#0072bc] flex items-center justify-center font-bold text-[10px]">
+                                    <i class="fa-solid fa-user"></i>
+                                </div>
+                                <span x-text="st.name"></span>
+                            </td>
+                            <td class="p-2.5 text-center font-bold text-slate-700" x-text="st.orderCount + ' đơn'"></td>
+                            <td class="p-2.5 text-right font-semibold text-emerald-600" x-text="st.cashRevenue.toLocaleString() + 'đ'"></td>
+                            <td class="p-2.5 text-right font-semibold text-blue-600" x-text="st.bankRevenue.toLocaleString() + 'đ'"></td>
+                            <td class="p-2.5 text-right font-black text-slate-900 bg-slate-50/80 text-sm" x-text="st.totalRevenue.toLocaleString() + 'đ'"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ================= 4. SUB-TAB: BÁO CÁO THEO BÀN ================= -->
+    <div x-show="reportsSubTab === 'tables'" class="space-y-4">
+        <div class="border rounded-lg overflow-hidden">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead class="bg-slate-100 uppercase text-slate-700 font-bold border-b">
+                    <tr>
+                        <th class="p-2.5">Tên Bàn / Vị Trí</th>
+                        <th class="p-2.5 text-center">Khu Vực</th>
+                        <th class="p-2.5 text-center w-36">Lượt Phục Vụ (Đơn)</th>
+                        <th class="p-2.5 text-right w-48">Tổng Tiền Bán Được</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    <template x-if="reportByTables.length === 0">
+                        <tr><td colspan="4" class="p-8 text-center text-slate-400">Chưa có lượt phục vụ bàn nào.</td></tr>
+                    </template>
+                    <template x-for="tbl in reportByTables" :key="tbl.name">
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="p-2.5 font-bold text-slate-800" x-text="tbl.name"></td>
+                            <td class="p-2.5 text-center text-slate-500 font-semibold" x-text="tbl.area"></td>
+                            <td class="p-2.5 text-center font-bold text-slate-700" x-text="tbl.orderCount + ' lượt'"></td>
+                            <td class="p-2.5 text-right font-black text-[#0072bc]" x-text="tbl.revenue.toLocaleString() + 'đ'"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ================= 5. SUB-TAB: KHUNG GIỜ & THANH TOÁN ================= -->
+    <div x-show="reportsSubTab === 'others'" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        
+        <!-- Bảng tỷ trọng theo Phương thức thanh toán -->
+        <div class="border rounded-xl p-3 bg-white space-y-3">
+            <h4 class="font-bold text-xs uppercase text-slate-700 border-b pb-1.5 flex items-center gap-1.5">
+                <i class="fa-solid fa-wallet text-emerald-600"></i> Cơ Cấu Hình Thức Thanh Toán
+            </h4>
+            <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 text-slate-600 border-b font-bold">
+                    <tr>
+                        <th class="p-2">Hình Thức</th>
+                        <th class="p-2 text-center">Số Giao Dịch</th>
+                        <th class="p-2 text-right">Tổng Tiền</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    <template x-for="pay in reportByPaymentMethods" :key="pay.name">
+                        <tr>
+                            <td class="p-2 font-bold text-slate-800" x-text="pay.name"></td>
+                            <td class="p-2 text-center text-slate-600" x-text="pay.count + ' đơn'"></td>
+                            <td class="p-2 text-right font-black text-emerald-600" x-text="pay.amount.toLocaleString() + 'đ'"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Bảng thống kê theo Khung giờ (Giờ vàng) -->
+        <div class="border rounded-xl p-3 bg-white space-y-3">
+            <h4 class="font-bold text-xs uppercase text-slate-700 border-b pb-1.5 flex items-center gap-1.5">
+                <i class="fa-solid fa-clock text-amber-500"></i> Phân Bổ Doanh Thu Theo Giờ (Giờ Vàng)
+            </h4>
+            <div class="max-h-64 overflow-y-auto cukcuk-scroll">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-50 text-slate-600 border-b font-bold sticky top-0">
+                        <tr>
+                            <th class="p-2">Khung Giờ</th>
+                            <th class="p-2 text-center">Số Lượt Đơn</th>
+                            <th class="p-2 text-right">Doanh Thu Giờ</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y">
+                        <template x-if="reportByHourly.length === 0">
+                            <tr><td colspan="3" class="p-4 text-center text-slate-400">Chưa có giao dịch theo giờ.</td></tr>
+                        </template>
+                        <template x-for="h in reportByHourly" :key="h.hour">
+                            <tr>
+                                <td class="p-2 font-mono font-bold text-slate-700" x-text="h.hour"></td>
+                                <td class="p-2 text-center font-bold text-slate-600" x-text="h.orderCount + ' đơn'"></td>
+                                <td class="p-2 text-right font-black text-[#0072bc]" x-text="h.revenue.toLocaleString() + 'đ'"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+</div>
         <!-- TAB 7: LỊCH SỬ HÓA ĐƠN & BỘ LỌC ĐA NĂNG -->
 <div x-show="currentTab === 'history_orders'" class="flex-1 bg-white rounded border border-slate-300 p-4 overflow-y-auto space-y-4">
     
@@ -912,6 +1153,301 @@
             </tbody>
         </table>
     </div>
+
+</div>
+<!-- TAB 9: CÀI ĐẶT HỆ THỐNG & KHUYẾN MÃI -->
+<div x-show="currentTab === 'settings'" class="flex-1 bg-white rounded border border-slate-300 p-4 overflow-y-auto space-y-4">
+    
+    <!-- Tiêu đề & Chọn Phân nhóm Cài Đặt -->
+    <div class="flex flex-wrap justify-between items-center border-b pb-3 gap-2">
+        <div class="flex items-center gap-3">
+            <h2 class="font-extrabold text-slate-800 text-base flex items-center gap-2">
+                <i class="fa-solid fa-sliders text-[#0072bc]"></i> Cài Đặt Hệ Thống & Quản Trị
+            </h2>
+            <div class="flex bg-slate-100 p-1 rounded-lg border text-xs font-bold">
+                <button @click="settingsSubTab = 'store'" :class="settingsSubTab === 'store' ? 'bg-[#0072bc] text-white shadow' : 'text-slate-600'" class="px-3 py-1 rounded transition">Thông Tin & Mẫu Bill In</button>
+                <button @click="settingsSubTab = 'promotions'" :class="settingsSubTab === 'promotions' ? 'bg-[#0072bc] text-white shadow' : 'text-slate-600'" class="px-3 py-1 rounded transition">Chương Trình Khuyến Mãi</button>
+                <!-- Nút chuyển sang Tab Nhật ký thao tác -->
+                <button @click="settingsSubTab = 'logs'" :class="settingsSubTab === 'logs' ? 'bg-[#0072bc] text-white shadow' : 'text-slate-600'" class="px-3 py-1 rounded transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-shield-halved"></i> Nhật Ký Thao Tác
+                </button>
+            </div>
+        </div>
+
+        <!-- Các nút hành động tương ứng từng subTab -->
+        <button x-show="settingsSubTab === 'store'" @click="saveStoreSettings()" class="px-4 py-1.5 bg-[#0072bc] hover:bg-blue-700 text-white rounded text-xs font-bold transition flex items-center gap-1.5 shadow">
+            <i class="fa-solid fa-floppy-disk"></i> Lưu Toàn Bộ Cấu Hình
+        </button>
+        <button x-show="settingsSubTab === 'promotions'" @click="openPromoModal()" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold transition flex items-center gap-1.5 shadow">
+            <i class="fa-solid fa-plus"></i> + Thêm Khuyến Mãi Mới
+        </button>
+        <!-- Nút Xóa Sạch Nhật Ký -->
+        <button x-show="settingsSubTab === 'logs' && hasPermission(['Quản lý'])" @click="clearAllLogs()" class="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded text-xs font-bold transition flex items-center gap-1.5 shadow">
+            <i class="fa-solid fa-trash-can"></i> Xóa Sạch Toàn Bộ Nhật Ký
+        </button>
+    </div>
+
+    <!-- 1. CÀI ĐẶT THÔNG TIN QUÁN, KHỔ GIẤY & QR CODE IN BILL -->
+    <div x-show="settingsSubTab === 'store'" class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        
+        <!-- Cột Form Cài Đặt -->
+        <div class="lg:col-span-7 space-y-4">
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                <h4 class="font-bold text-xs uppercase text-slate-700 border-b pb-1.5 flex items-center gap-1.5">
+                    <i class="fa-solid fa-store text-[#0072bc]"></i> 1. Thông Tin Quán Trên Bill
+                </h4>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Tên Quán (*)</label>
+                        <input type="text" x-model="storeSettings.storeName" class="w-full px-3 py-1.5 bg-white border rounded text-xs font-bold text-slate-800">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Hotline / SĐT</label>
+                        <input type="text" x-model="storeSettings.phone" class="w-full px-3 py-1.5 bg-white border rounded text-xs">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Địa chỉ quán</label>
+                    <input type="text" x-model="storeSettings.address" class="w-full px-3 py-1.5 bg-white border rounded text-xs">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Mật khẩu Wifi</label>
+                        <input type="text" x-model="storeSettings.wifiPass" class="w-full px-3 py-1.5 bg-white border rounded text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Lời cảm ơn chân trang bill</label>
+                        <input type="text" x-model="storeSettings.footerMessage" class="w-full px-3 py-1.5 bg-white border rounded text-xs">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Khổ Giấy In & Ngân Hàng VietQR -->
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                <h4 class="font-bold text-xs uppercase text-slate-700 border-b pb-1.5 flex items-center gap-1.5">
+                    <i class="fa-solid fa-qrcode text-emerald-600"></i> 2. Khổ Giấy & Mã QR Thanh Toán Trên Bill
+                </h4>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Khổ giấy in nhiệt (*)</label>
+                        <select x-model="storeSettings.paperSize" class="w-full px-3 py-1.5 bg-white border rounded text-xs font-bold text-[#0072bc]">
+                            <option value="80mm">Khổ K80 (80mm - Tiêu chuẩn)</option>
+                            <option value="58mm">Khổ K57 / K58 (58mm - Máy in nhỏ)</option>
+                            <option value="a4">Khổ A4 / A5 (Văn phòng)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Ngân hàng (VietQR)</label>
+                        <select x-model="storeSettings.bankCode" class="w-full px-3 py-1.5 bg-white border rounded text-xs font-bold">
+                            <option value="MB">MB Bank (Quân Đội)</option>
+                            <option value="VCB">Vietcombank</option>
+                            <option value="TCB">Techcombank</option>
+                            <option value="ACB">ACB</option>
+                            <option value="VPB">VPBank</option>
+                            <option value="ICB">VietinBank</option>
+                            <option value="BIDV">BIDV</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Số Tài Khoản</label>
+                        <input type="text" x-model="storeSettings.bankAccount" placeholder="Số TK nhận tiền..." class="w-full px-3 py-1.5 bg-white border rounded text-xs font-mono font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Tên Chủ Tài Khoản</label>
+                        <input type="text" x-model="storeSettings.bankAccountName" placeholder="NGUYEN VAN A..." class="w-full px-3 py-1.5 bg-white border rounded text-xs font-bold uppercase">
+                    </div>
+                </div>
+            </div>
+            <!-- KHỐI 3: CẤU HÌNH BOT TELEGRAM THÔNG BÁO -->
+<div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+    <div class="flex justify-between items-center border-b pb-1.5">
+        <h4 class="font-bold text-xs uppercase text-slate-700 flex items-center gap-1.5">
+            <i class="fa-brands fa-telegram text-sky-500 text-sm"></i> 3. Cài Đặt Bot Telegram Nhóm Quản Lý
+        </h4>
+        <div class="flex items-center gap-1.5">
+            <input type="checkbox" id="enableTele" x-model="storeSettings.enableTelegramNotify" class="w-4 h-4 rounded text-[#0072bc]">
+            <label for="enableTele" class="text-xs font-bold text-slate-700 cursor-pointer">Bật thông báo</label>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">Telegram Bot Token (*)</label>
+            <input type="text" x-model="storeSettings.telegramBotToken" placeholder="VD: 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11" class="w-full px-3 py-1.5 bg-white border rounded text-xs font-mono">
+        </div>
+        <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">Chat ID Nhóm / Quản Lý (*)</label>
+            <input type="text" x-model="storeSettings.telegramChatId" placeholder="VD: -1001234567890 hoặc ID cá nhân" class="w-full px-3 py-1.5 bg-white border rounded text-xs font-mono font-bold">
+        </div>
+    </div>
+
+    <div class="flex flex-wrap justify-between items-center pt-1 text-[11px] text-slate-500">
+        <p>• Nhận tin nhắn khi: Bán hàng xong, Kết ca làm việc, Sửa/Xóa đơn, Hủy món.</p>
+        <button type="button" @click="testTelegramBot()" class="px-3 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded text-xs font-bold transition flex items-center gap-1 shadow-sm">
+            <i class="fa-solid fa-paper-plane"></i> Gửi Thử Tin Nhắn
+        </button>
+    </div>
+</div>
+        </div>
+
+        <!-- Cột Xem Trước (Live Preview) Mẫu Hóa Đơn Chuẩn Nhiệt -->
+        <div class="lg:col-span-5 flex flex-col items-center">
+            <p class="text-[11px] font-bold text-slate-500 uppercase mb-2">Xem trước mẫu in bill thực tế</p>
+            <div class="bg-white border border-slate-300 p-4 shadow-md rounded-xl text-slate-900 font-mono text-xs w-full max-w-[280px] space-y-2 select-none">
+                <div class="text-center border-b border-dashed pb-2">
+                    <h3 class="font-extrabold text-sm uppercase" x-text="storeSettings.storeName"></h3>
+                    <p class="text-[10px] text-slate-500" x-text="storeSettings.address"></p>
+                    <p class="text-[10px] text-slate-500" x-text="'Hotline: ' + storeSettings.phone"></p>
+                    <p class="text-[10px] text-slate-500" x-text="'Wifi: ' + storeSettings.wifiPass"></p>
+                </div>
+
+                <div class="text-[11px] space-y-0.5">
+                    <div class="flex justify-between"><span>Bàn: <strong>Bàn 01</strong></span><span>Thu ngân: Admin</span></div>
+                    <div class="flex justify-between text-slate-400 text-[10px]"><span>25/08/2026 20:30</span><span>#HD0001</span></div>
+                </div>
+
+                <div class="border-y border-dashed py-1.5 space-y-1 text-[11px]">
+                    <div class="flex justify-between"><span>1x Cà phê sữa đá</span><span>25.000đ</span></div>
+                    <div class="flex justify-between"><span>1x Trà đào cam sả</span><span>30.000đ</span></div>
+                </div>
+
+                <div class="space-y-0.5 text-xs font-bold pt-1">
+                    <div class="flex justify-between"><span>Tiền hàng:</span><span>55.000đ</span></div>
+                    <div class="flex justify-between text-rose-600"><span>Giảm giá (10%):</span><span>-5.500đ</span></div>
+                    <div class="flex justify-between text-sm font-black pt-1 border-t"><span>TỔNG CỘNG:</span><span class="text-[#0072bc]">49.500đ</span></div>
+                </div>
+
+                <!-- QR Code Thanh Toán VietQR Mẫu -->
+                <div class="text-center pt-2 border-t border-dashed flex flex-col items-center">
+                    <p class="text-[10px] font-bold text-slate-600 mb-1">Quét mã chuyển khoản nhanh:</p>
+                    <img :src="getVietQrUrl(49500, 'Thanh toan Ban 01')" class="w-32 h-32 border p-1 rounded bg-white shadow-sm">
+                    <p class="text-[10px] text-slate-400 mt-2 italic" x-text="storeSettings.footerMessage"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. CÀI ĐẶT CHƯƠNG TRÌNH KHUYẾN MÃI -->
+    <div x-show="settingsSubTab === 'promotions'" class="space-y-4">
+        <div class="border rounded-lg overflow-hidden">
+    <table class="w-full text-left text-xs border-collapse">
+        <thead class="bg-slate-100 uppercase text-slate-700 font-bold border-b">
+            <tr>
+                <th class="p-2.5">Tên Chương Trình</th>
+                <th class="p-2.5 text-right">Đơn Tối Thiểu</th>
+                <th class="p-2.5 text-center">Mức Giảm</th>
+                <th class="p-2.5">Thời Gian Áp Dụng</th>
+                <th class="p-2.5 text-center">Trạng Thái</th>
+                <th class="p-2.5 text-right w-24">Thao Tác</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y">
+            <template x-if="promotionsList.length === 0">
+                <tr><td colspan="6" class="p-8 text-center text-slate-400">Chưa có chương trình khuyến mãi nào.</td></tr>
+            </template>
+            <template x-for="p in promotionsList" :key="p.id">
+                <tr class="hover:bg-slate-50 transition">
+                    <td class="p-2.5 font-bold text-slate-800" x-text="p.name"></td>
+                    <td class="p-2.5 text-right font-semibold" x-text="Number(p.minOrderValue || 0).toLocaleString() + 'đ'"></td>
+                    <td class="p-2.5 text-center font-black text-rose-600" x-text="p.discountPercent + '%'"></td>
+                    <td class="p-2.5 text-[11px] text-slate-600">
+                        <template x-if="!p.startDate && !p.endDate">
+                            <span class="text-slate-400 italic">Vô thời hạn</span>
+                        </template>
+                        <template x-if="p.startDate || p.endDate">
+                            <div>
+                                <span x-text="p.startDate ? new Date(p.startDate).toLocaleString('vi-VN') : 'Bắt đầu'"></span>
+                                <span class="text-slate-400"> &rarr; </span>
+                                <span x-text="p.endDate ? new Date(p.endDate).toLocaleString('vi-VN') : 'Không thời hạn'"></span>
+                            </div>
+                        </template>
+                    </td>
+                    <td class="p-2.5 text-center">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold"
+                              :class="p.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'"
+                              x-text="p.isActive ? 'Đang chạy' : 'Tạm dừng'"></span>
+                    </td>
+                    <td class="p-2.5 text-right space-x-1">
+                        <button @click="openEditPromoModal(p)" class="p-1 text-blue-600 hover:text-blue-800"><i class="fa-solid fa-pen"></i></button>
+                        <button @click="deletePromotion(p.id)" class="p-1 text-red-600 hover:text-red-800"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>
+            </template>
+        </tbody>
+    </table>
+</div>
+
+    </div>
+    <div x-show="settingsSubTab === 'logs'" class="space-y-4">
+        <div class="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <div>
+                <p class="font-bold text-xs text-slate-800 uppercase">Lịch sử vết can thiệp hệ thống</p>
+                <p class="text-[11px] text-slate-500">Ghi lại toàn bộ hành vi Sửa/Xóa hóa đơn, Hủy order bàn và Xóa thu chi</p>
+            </div>
+            <span class="text-xs bg-blue-100 text-[#0072bc] px-3 py-1 rounded-full font-bold" x-text="(systemLogsList || []).length + ' lượt ghi nhận'"></span>
+        </div>
+
+        <div class="border rounded-lg overflow-hidden shadow-sm">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead class="bg-slate-100 uppercase text-slate-700 font-bold border-b">
+                    <tr>
+                        <th class="p-2.5 w-36">Thời Gian</th>
+                        <th class="p-2.5 w-36">Hành Động</th>
+                        <th class="p-2.5 w-40">Người Thực Hiện</th>
+                        <th class="p-2.5">Chi Tiết Thao Tác</th>
+                        <th class="p-2.5 text-right w-16" x-show="hasPermission(['Quản lý'])">Xóa</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    <template x-if="systemLogsList.length === 0">
+                        <tr>
+                            <td colspan="5" class="p-8 text-center text-slate-400">
+                                <i class="fa-solid fa-clipboard-check text-2xl text-slate-300 block mb-1"></i>
+                                Hệ thống sạch sẽ, chưa có can thiệp sửa/xóa nào được ghi nhận.
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-for="log in systemLogsList" :key="log.id">
+                        <tr class="hover:bg-slate-50 transition">
+                            <!-- Thời gian -->
+                            <td class="p-2.5 whitespace-nowrap text-slate-500 font-mono text-[11px]" x-text="new Date(log.timestamp).toLocaleString('vi-VN')"></td>
+                            
+                            <!-- Loại hành vi -->
+                            <td class="p-2.5 whitespace-nowrap">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-black"
+                                      :class="{
+                                          'bg-rose-100 text-rose-800 border border-rose-200': log.action.includes('XÓA'),
+                                          'bg-amber-100 text-amber-800 border border-amber-200': log.action.includes('SỬA'),
+                                          'bg-purple-100 text-purple-800 border border-purple-200': log.action.includes('HỦY')
+                                      }"
+                                      x-text="log.action"></span>
+                            </td>
+
+                            <!-- Người thực hiện -->
+                            <td class="p-2.5 font-bold text-slate-800">
+                                <p x-text="log.actorName"></p>
+                                <span class="text-[10px] text-slate-400 font-normal" x-text="log.actorRole + ' (' + log.actorUsername + ')'"></span>
+                            </td>
+
+                            <!-- Diễn giải chi tiết -->
+                            <td class="p-2.5 text-slate-700 font-mono text-[11px]" x-text="log.description"></td>
+
+                            <!-- Nút xóa dòng log riêng lẻ -->
+                            <td class="p-2.5 text-right whitespace-nowrap" x-show="hasPermission(['Quản lý'])">
+                                <button @click="deleteSingleLog(log.id)" class="p-1 text-slate-400 hover:text-red-600 transition" title="Xóa dòng log này">
+                                    <i class="fa-solid fa-trash text-xs"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
 
 </div>
 
@@ -1209,35 +1745,75 @@
             </div>
         </div>
     </div>
-    <!-- 8. MODAL IN PHIẾU TẠM TÍNH -->
-    <div x-show="showBillModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm" style="display: none;">
-        <div class="bg-white w-full max-w-xs p-5 rounded-xl shadow-2xl space-y-3">
-            <div class="text-center border-b pb-2">
-                <h3 class="font-bold text-sm">PHIẾU TẠM TÍNH</h3>
-                <p class="text-[10px] text-slate-400">SORA COFFEE</p>
+    <!-- 8. MODAL IN PHIẾU TẠM TÍNH (ĐỒNG BỘ THEO CÀI ĐẶT STORE & MÃ VIETQR) -->
+<div x-show="showBillModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm" style="display: none;">
+    <div class="bg-white p-5 rounded-2xl shadow-2xl space-y-3 font-mono text-slate-900 max-h-[95vh] overflow-y-auto w-full max-w-xs text-xs">
+        
+        <!-- VÙNG IN TẠM TÍNH -->
+        <div id="temp-bill-print-area" class="space-y-3">
+            <div class="text-center border-b border-dashed border-slate-300 pb-2">
+                <h3 class="font-extrabold text-sm uppercase" x-text="storeSettings.storeName || 'HomesCoffee'"></h3>
+                <p class="text-[10px] text-slate-500" x-text="storeSettings.address"></p>
+                <p class="text-[10px] text-slate-500" x-text="'Hotline: ' + storeSettings.phone"></p>
+                <div class="mt-1 pt-1 border-t border-dotted border-slate-200">
+                    <span class="font-black text-xs uppercase tracking-wider text-slate-800">PHIẾU TẠM TÍNH</span>
+                </div>
             </div>
-            <div class="text-xs space-y-1 text-slate-600">
-                <p><strong>Bàn:</strong> <span x-text="selectedTable?.name"></span></p>
-                <p><strong>Thời gian:</strong> <span x-text="new Date().toLocaleString()"></span></p>
+
+            <div class="space-y-0.5 text-[11px]">
+                <div class="flex justify-between">
+                    <span>Bàn: <strong x-text="selectedTable ? (selectedTable.name + ' (' + selectedTable.area + ')') : ''"></strong></span>
+                    <span x-text="'Thu ngân: ' + (currentUser ? currentUser.name : 'Thu ngân')"></span>
+                </div>
+                <div class="flex justify-between text-slate-500 text-[10px]">
+                    <span>Thời gian:</span>
+                    <span x-text="new Date().toLocaleString('vi-VN')"></span>
+                </div>
             </div>
-            <div class="border-y py-2 space-y-1 max-h-36 overflow-y-auto text-xs">
-                <template x-for="item in currentOrder.items">
-                    <div class="flex justify-between">
-                        <span x-text="item.name + ' x' + item.qty"></span>
-                        <span class="font-bold" x-text="(item.price * item.qty).toLocaleString() + 'đ'"></span>
+
+            <div class="border-y border-dashed border-slate-300 py-2 space-y-1">
+                <template x-for="item in currentOrder.items" :key="item.name">
+                    <div class="flex justify-between items-start">
+                        <span x-text="item.qty + 'x ' + item.name"></span>
+                        <span class="font-bold whitespace-nowrap" x-text="(item.price * item.qty).toLocaleString() + 'đ'"></span>
                     </div>
                 </template>
             </div>
-            <div class="flex justify-between font-black text-sm text-[#0072bc]">
-                <span>TỔNG CỘNG:</span>
-                <span x-text="finalTotal().toLocaleString() + 'đ'"></span>
+
+            <div class="space-y-1 text-xs pt-0.5">
+                <div class="flex justify-between text-slate-600">
+                    <span>Tiền hàng:</span>
+                    <span class="font-bold" x-text="subTotal().toLocaleString() + 'đ'"></span>
+                </div>
+                <template x-if="discountCalculated > 0">
+                    <div class="flex justify-between text-rose-600 font-bold">
+                        <span x-text="matchedPromotion ? ('KM (' + matchedPromotion.name + '):') : 'Chiết khấu:'"></span>
+                        <span x-text="'-' + discountCalculated.toLocaleString() + 'đ'"></span>
+                    </div>
+                </template>
+                <div class="flex justify-between font-black text-sm text-[#0072bc] border-t border-dashed border-slate-300 pt-1.5">
+                    <span>TỔNG CỘNG:</span>
+                    <span x-text="finalTotal().toLocaleString() + 'đ'"></span>
+                </div>
             </div>
-            <div class="flex gap-2 pt-2">
-                <button @click="showBillModal = false" class="flex-1 py-1.5 bg-slate-100 rounded text-xs font-bold">Đóng</button>
-                <button @click="window.print(); showBillModal = false;" class="flex-1 py-1.5 bg-[#0072bc] text-white rounded text-xs font-bold">In Phiếu</button>
-            </div>
+
+            <template x-if="storeSettings.showQrPayment && storeSettings.bankAccount">
+                <div class="text-center pt-2 border-t border-dashed border-slate-300 flex flex-col items-center">
+                    <img :src="getVietQrUrl(finalTotal(), 'Thanh toan ' + (selectedTable ? selectedTable.name : ''))" class="w-32 h-32 border p-1 rounded bg-white shadow-sm">
+                </div>
+            </template>
+            <p class="text-center text-[10px] text-slate-400 italic pt-1" x-text="storeSettings.footerMessage || 'Xin cảm ơn quý khách!'"></p>
+        </div>
+
+        <!-- Nút bấm -->
+        <div class="flex gap-2 pt-2 border-t">
+            <button @click="showBillModal = false" class="flex-1 py-2 bg-slate-100 rounded-xl text-xs font-bold">Đóng</button>
+            <button @click="printReceipt('temp-bill-print-area')" class="flex-1 py-2 bg-[#0072bc] hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1 shadow">
+                <i class="fa-solid fa-print"></i> In Phiếu
+            </button>
         </div>
     </div>
+</div>
     <!-- MODAL THÊM / SỬA DANH MỤC MÓN -->
 <div x-show="showCategoryModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm" style="display: none;">
     <div class="bg-white w-full max-w-sm p-5 rounded-xl shadow-2xl space-y-4">
@@ -1345,30 +1921,46 @@
 
             <!-- Khối Giảm Giá (% hoặc VNĐ) -->
             <div class="pt-2 border-t border-slate-200">
-                <div class="flex justify-between items-center mb-1.5">
-                    <span class="text-xs font-bold text-slate-700">Chiết khấu / Giảm giá:</span>
-                    <div class="flex gap-1 bg-white p-0.5 border rounded-lg text-xs font-bold">
-                        <button type="button" @click="discountType = 'percent'" :class="discountType === 'percent' ? 'bg-[#0072bc] text-white' : 'text-slate-600'" class="px-2 py-0.5 rounded transition">%</button>
-                        <button type="button" @click="discountType = 'amount'" :class="discountType === 'amount' ? 'bg-[#0072bc] text-white' : 'text-slate-600'" class="px-2 py-0.5 rounded transition">VNĐ</button>
-                    </div>
-                </div>
+    <!-- Hiển thị badge nếu đang ăn theo Khuyến Mãi Hệ Thống -->
+    <template x-if="matchedPromotion">
+        <div class="p-2 bg-emerald-50 border border-emerald-200 rounded-lg text-xs flex justify-between items-center mb-1.5">
+            <span class="font-bold text-emerald-800 flex items-center gap-1">
+                <i class="fa-solid fa-gift text-emerald-600"></i>
+                <span x-text="'Áp dụng KM: ' + matchedPromotion.name + ' (-' + matchedPromotion.discountPercent + '%)'"></span>
+            </span>
+            <span class="font-black text-rose-600" x-text="'-' + discountCalculated.toLocaleString() + 'đ'"></span>
+        </div>
+    </template>
 
-                <div class="flex items-center gap-2">
-                    <template x-if="discountType === 'percent'">
-                        <div class="flex items-center gap-1.5 flex-1">
-                            <input type="number" x-model.number="discountPercent" min="0" max="100" placeholder="0" class="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-right focus:outline-none focus:border-[#0072bc]">
-                            <span class="text-xs font-bold text-slate-500">%</span>
-                        </div>
-                    </template>
-                    <template x-if="discountType === 'amount'">
-                        <div class="flex items-center gap-1.5 flex-1">
-                            <input type="number" x-model.number="discountAmount" min="0" placeholder="0" class="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-right focus:outline-none focus:border-[#0072bc]">
-                            <span class="text-xs font-bold text-slate-500">đ</span>
-                        </div>
-                    </template>
-                    <span class="text-xs text-rose-600 font-bold whitespace-nowrap" x-text="'-' + discountCalculated.toLocaleString() + 'đ'"></span>
+    <!-- Khối chỉnh giảm giá thủ công (chỉ hiện khi không có khuyến mãi tự động) -->
+    <template x-if="!matchedPromotion">
+        <div>
+            <div class="flex justify-between items-center mb-1.5">
+                <span class="text-xs font-bold text-slate-700">Chiết khấu / Giảm giá thủ công:</span>
+                <div class="flex gap-1 bg-white p-0.5 border rounded-lg text-xs font-bold">
+                    <button type="button" @click="discountType = 'percent'" :class="discountType === 'percent' ? 'bg-[#0072bc] text-white' : 'text-slate-600'" class="px-2 py-0.5 rounded transition">%</button>
+                    <button type="button" @click="discountType = 'amount'" :class="discountType === 'amount' ? 'bg-[#0072bc] text-white' : 'text-slate-600'" class="px-2 py-0.5 rounded transition">VNĐ</button>
                 </div>
             </div>
+
+            <div class="flex items-center gap-2">
+                <template x-if="discountType === 'percent'">
+                    <div class="flex items-center gap-1.5 flex-1">
+                        <input type="number" x-model.number="discountPercent" min="0" max="100" placeholder="0" class="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-right focus:outline-none focus:border-[#0072bc]">
+                        <span class="text-xs font-bold text-slate-500">%</span>
+                    </div>
+                </template>
+                <template x-if="discountType === 'amount'">
+                    <div class="flex items-center gap-1.5 flex-1">
+                        <input type="number" x-model.number="discountAmount" min="0" placeholder="0" class="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-right focus:outline-none focus:border-[#0072bc]">
+                        <span class="text-xs font-bold text-slate-500">đ</span>
+                    </div>
+                </template>
+                <span class="text-xs text-rose-600 font-bold whitespace-nowrap" x-text="'-' + discountCalculated.toLocaleString() + 'đ'"></span>
+            </div>
+        </div>
+    </template>
+</div>
 
             <!-- Tổng Cần Thanh Toán -->
             <div class="flex justify-between items-center text-sm font-black text-slate-900 border-t border-slate-200 pt-2">
@@ -1426,50 +2018,73 @@
     </div>
 </div>
 <!-- 1. MODAL XEM CHI TIẾT & IN LẠI HÓA ĐƠN -->
-<div x-show="showBillDetailModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm" style="display: none;">
-    <div class="bg-white w-full max-w-sm p-5 rounded-2xl shadow-2xl space-y-3 max-h-[90vh] overflow-y-auto">
-        <div class="text-center border-b pb-2">
-            <h3 class="font-extrabold text-sm text-slate-900 uppercase">HÓA ĐƠN BÁN HÀNG</h3>
-            <p class="text-[10px] text-slate-400">SORA COFFEE</p>
-        </div>
-        <div class="text-xs space-y-1 text-slate-600">
-            <p><strong>Bàn:</strong> <span x-text="selectedBillToView?.table"></span></p>
-            <p><strong>Thời gian:</strong> <span x-text="selectedBillToView ? new Date(selectedBillToView.timestamp).toLocaleString() : ''"></span></p>
-            <p><strong>Thanh toán:</strong> <span class="font-bold text-[#0072bc]" x-text="selectedBillToView?.paymentMethod"></span></p>
-            <template x-if="selectedBillToView?.note">
-                <p><strong>Ghi chú:</strong> <span x-text="selectedBillToView?.note"></span></p>
-            </template>
-        </div>
+<div x-show="showBillDetailModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm" style="display: none;">
+    <div class="bg-white p-5 rounded-2xl shadow-2xl space-y-3 font-mono text-slate-900 max-h-[95vh] overflow-y-auto w-full max-w-xs text-xs">
+        
+        <!-- VÙNG IN HÓA ĐƠN THANH TOÁN -->
+        <div id="final-bill-print-area" class="space-y-3">
+            <div class="text-center border-b border-dashed border-slate-300 pb-2">
+                <h3 class="font-extrabold text-sm uppercase" x-text="storeSettings.storeName || 'HomesCoffee'"></h3>
+                <p class="text-[10px] text-slate-500" x-text="storeSettings.address"></p>
+                <p class="text-[10px] text-slate-500" x-text="'Hotline: ' + storeSettings.phone"></p>
+                <div class="mt-1 pt-1 border-t border-dotted border-slate-200">
+                    <span class="font-black text-xs uppercase tracking-wider text-slate-900">HÓA ĐƠN THANH TOÁN</span>
+                </div>
+            </div>
 
-        <div class="border-y py-2 space-y-1.5 max-h-48 overflow-y-auto text-xs">
-            <template x-for="item in (selectedBillToView?.items || [])">
-                <div class="flex justify-between items-center">
-                    <span x-text="item.name + ' (x' + item.qty + ')'"></span>
-                    <span class="font-bold text-slate-800" x-text="(item.price * item.qty).toLocaleString() + 'đ'"></span>
+            <div class="space-y-0.5 text-[11px]">
+                <div class="flex justify-between">
+                    <span>Bàn: <strong x-text="selectedBillToView?.table"></strong></span>
+                    <span x-text="'Thu ngân: ' + (selectedBillToView?.cashier || 'Thu ngân')"></span>
+                </div>
+                <div class="flex justify-between text-slate-500 text-[10px]">
+                    <span>Thời gian:</span>
+                    <span x-text="selectedBillToView ? new Date(selectedBillToView.timestamp).toLocaleString('vi-VN') : ''"></span>
+                </div>
+                <div class="flex justify-between text-slate-500 text-[10px]">
+                    <span>Hình thức:</span>
+                    <span class="font-bold text-[#0072bc]" x-text="selectedBillToView?.paymentMethod"></span>
+                </div>
+            </div>
+
+            <div class="border-y border-dashed border-slate-300 py-2 space-y-1">
+                <template x-for="item in (selectedBillToView?.items || [])" :key="item.name">
+                    <div class="flex justify-between items-start">
+                        <span x-text="item.qty + 'x ' + item.name"></span>
+                        <span class="font-bold whitespace-nowrap" x-text="(item.price * item.qty).toLocaleString() + 'đ'"></span>
+                    </div>
+                </template>
+            </div>
+
+            <div class="space-y-1 text-xs pt-0.5">
+                <div class="flex justify-between text-slate-600">
+                    <span>Tiền hàng:</span>
+                    <span x-text="((selectedBillToView?.subTotal || selectedBillToView?.total) || 0).toLocaleString() + 'đ'"></span>
+                </div>
+                <template x-if="selectedBillToView?.discount > 0">
+                    <div class="flex justify-between text-rose-600 font-bold">
+                        <span>Chiết khấu / KM:</span>
+                        <span x-text="'-' + Number(selectedBillToView.discount).toLocaleString() + 'đ'"></span>
+                    </div>
+                </template>
+                <div class="flex justify-between font-black text-sm text-[#0072bc] border-t border-dashed border-slate-300 pt-1.5">
+                    <span>TỔNG CỘNG:</span>
+                    <span x-text="((selectedBillToView?.total) || 0).toLocaleString() + 'đ'"></span>
+                </div>
+            </div>
+
+            <template x-if="storeSettings.showQrPayment && storeSettings.bankAccount">
+                <div class="text-center pt-2 border-t border-dashed border-slate-300 flex flex-col items-center">
+                    <img :src="getVietQrUrl(selectedBillToView?.total || 0, 'Thanh toan ' + (selectedBillToView?.table || ''))" class="w-32 h-32 border p-1 rounded bg-white shadow-sm">
                 </div>
             </template>
+            <p class="text-center text-[10px] text-slate-400 italic pt-1" x-text="storeSettings.footerMessage || 'Xin cảm ơn & Hẹn gặp lại quý khách!'"></p>
         </div>
 
-        <div class="space-y-1 text-xs pt-1">
-            <div class="flex justify-between text-slate-500">
-                <span>Tiền hàng:</span>
-                <span x-text="((selectedBillToView?.subTotal || selectedBillToView?.total) || 0).toLocaleString() + 'đ'"></span>
-            </div>
-            <template x-if="selectedBillToView?.discount">
-                <div class="flex justify-between text-rose-600 font-semibold">
-                    <span>Chiết khấu:</span>
-                    <span x-text="'-' + (selectedBillToView.discount || 0).toLocaleString() + 'đ'"></span>
-                </div>
-            </template>
-            <div class="flex justify-between font-black text-sm text-[#0072bc] border-t pt-1">
-                <span>TỔNG CỘNG:</span>
-                <span x-text="((selectedBillToView?.total) || 0).toLocaleString() + 'đ'"></span>
-            </div>
-        </div>
-
+        <!-- Nút bấm -->
         <div class="flex gap-2 pt-2 border-t">
-            <button @click="showBillDetailModal = false" class="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition">Đóng</button>
-            <button @click="printReprintBill()" class="flex-1 py-2 bg-[#0072bc] hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow">
+            <button @click="showBillDetailModal = false" class="flex-1 py-2 bg-slate-100 rounded-xl text-xs font-bold">Đóng</button>
+            <button @click="printReceipt('final-bill-print-area')" class="flex-1 py-2 bg-[#0072bc] hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1 shadow">
                 <i class="fa-solid fa-print"></i> In Hóa Đơn
             </button>
         </div>
@@ -1872,6 +2487,54 @@
                     <span class="text-[9px] text-[#0072bc] font-bold mt-1">Quét mã gọi món</span>
                 </div>
             </template>
+        </div>
+    </div>
+</div>
+<!-- MODAL THÊM / SỬA CHƯƠNG TRÌNH KHUYẾN MÃI -->
+<div x-show="showPromoModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm" style="display: none;">
+    <div class="bg-white w-full max-w-sm p-5 rounded-2xl shadow-2xl space-y-3">
+        <div class="flex justify-between items-center border-b pb-2">
+            <h3 class="font-bold text-slate-800 text-sm" x-text="isEditingPromo ? 'Sửa Khuyến Mãi' : 'Thêm Khuyến Mãi Mới'"></h3>
+            <button @click="showPromoModal = false" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">Tên chương trình (*)</label>
+            <input type="text" x-model="promoForm.name" placeholder="VD: Khai trương giảm 10%, Tuần lễ vàng..." class="w-full px-3 py-1.5 bg-slate-50 border rounded-lg text-xs font-bold">
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+            <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1">Đơn tối thiểu (VNĐ)</label>
+                <input type="number" x-model.number="promoForm.minOrderValue" class="w-full px-3 py-1.5 bg-slate-50 border rounded-lg text-xs font-bold">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1">Mức giảm (%)</label>
+                <input type="number" x-model.number="promoForm.discountPercent" min="1" max="100" class="w-full px-3 py-1.5 bg-slate-50 border rounded-lg text-xs font-black text-rose-600">
+            </div>
+        </div>
+
+        <!-- Khoảng thời gian áp dụng -->
+        <div class="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+            <div>
+                <label class="block text-[11px] font-bold text-slate-600 mb-1">Bắt đầu từ:</label>
+                <input type="datetime-local" x-model="promoForm.startDate" class="w-full px-2 py-1 bg-white border rounded text-[11px] focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-[11px] font-bold text-slate-600 mb-1">Kết thúc vào:</label>
+                <input type="datetime-local" x-model="promoForm.endDate" class="w-full px-2 py-1 bg-white border rounded text-[11px] focus:outline-none">
+            </div>
+            <p class="col-span-2 text-[10px] text-slate-400 italic">* Để trống nếu áp dụng vô thời hạn</p>
+        </div>
+
+        <div class="flex items-center gap-2 pt-1">
+            <input type="checkbox" id="promoActive" x-model="promoForm.isActive" class="w-4 h-4 rounded text-[#0072bc]">
+            <label for="promoActive" class="text-xs font-bold text-slate-700 cursor-pointer">Kích hoạt chương trình</label>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t">
+            <button @click="showPromoModal = false" class="px-4 py-1.5 bg-slate-100 rounded-lg text-xs font-bold">Hủy</button>
+            <button @click="savePromotion()" class="px-5 py-1.5 bg-[#0072bc] hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-sm">Lưu Khuyến Mãi</button>
         </div>
     </div>
 </div>
