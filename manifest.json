@@ -1,0 +1,24 @@
+{
+  "name": "HomesCoffee Order",
+  "short_name": "Order POS",
+  "description": "Ứng dụng gọi món phục vụ bàn HomesCoffee",
+  "start_url": "oder.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0072bc",
+  "theme_color": "#0072bc",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/924/924514.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/924/924514.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
