@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CUKCUK Mobile Order - Phục Vụ</title>
     
+    <!-- ================= CẤU HÌNH PWA ================= -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0072bc">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Order POS">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/924/924514.png">
+
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome -->
@@ -40,7 +49,7 @@
                 <div class="w-14 h-14 bg-[#0072bc] text-white rounded-2xl flex items-center justify-center mx-auto mb-2 text-2xl shadow-lg shadow-blue-500/30">
                     <i class="fa-solid fa-utensils"></i>
                 </div>
-                <h2 class="font-black text-lg text-slate-800">CUKCUK ORDER</h2>
+                <h2 class="font-black text-lg text-slate-800">HOMESCOFFE ORDER</h2>
                 <p class="text-xs text-slate-400">Dành cho nhân viên phục vụ</p>
             </div>
 
@@ -169,14 +178,12 @@
 
                     <!-- BỘ TĂNG GIẢM SỐ LƯỢNG TRỰC TIẾP TRÊN CARD -->
                     <div class="flex-shrink-0">
-                        <!-- Khi món chưa có trong giỏ: Hiện nút + -->
                         <template x-if="getItemQty(m.name) === 0">
                             <button @click="addToCart(m)" class="w-8 h-8 rounded-full bg-blue-50 text-[#0072bc] border border-blue-200 flex items-center justify-center font-bold text-sm shadow-sm active:bg-[#0072bc] active:text-white transition">
                                 <i class="fa-solid fa-plus"></i>
                             </button>
                         </template>
 
-                        <!-- Khi món đã có trong giỏ: Hiện bộ nút [-] [SL] [+] -->
                         <template x-if="getItemQty(m.name) > 0">
                             <div class="flex items-center bg-white border border-blue-200 rounded-full p-0.5 shadow-sm">
                                 <button @click="changeQtyDirect(m, -1)" class="w-7 h-7 rounded-full bg-slate-100 active:bg-slate-200 text-slate-700 flex items-center justify-center font-black text-xs transition">
@@ -223,7 +230,6 @@
                 </button>
             </div>
 
-            <!-- Danh sách món đã chọn trong drawer -->
             <div class="flex-1 overflow-y-auto space-y-2 max-h-60 pr-1">
                 <template x-if="cartItems.length === 0">
                     <p class="text-center text-xs text-slate-400 py-6">Chưa có món nào được chọn</p>
@@ -244,7 +250,6 @@
                 </template>
             </div>
 
-            <!-- Nút gửi đơn -->
             <div class="pt-2 border-t flex gap-2">
                 <button @click="showCartDrawer = false" class="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold">Thêm Món Tiếp</button>
                 <button @click="sendOrderToKitchen(); showCartDrawer = false;" class="flex-1 py-2.5 bg-emerald-600 active:bg-emerald-700 text-white rounded-xl text-xs font-black shadow flex items-center justify-center gap-1.5 transition">
@@ -272,7 +277,7 @@
 
         function mobileOrderApp() {
             return {
-                view: 'tables', // Mặc định mở Sơ đồ bàn
+                view: 'tables',
                 currentUser: JSON.parse(localStorage.getItem('cukcuk_user') || 'null'),
                 loginForm: { username: '', pin: '' },
                 staffList: [],
@@ -373,13 +378,11 @@
                     this.view = 'ordering';
                 },
 
-                // Lấy số lượng hiện tại của món theo tên
                 getItemQty(itemName) {
                     const found = this.cartItems.find(i => i.name === itemName);
                     return found ? Number(found.qty) : 0;
                 },
 
-                // Thêm hoặc tăng số lượng món
                 addToCart(item) {
                     let existing = this.cartItems.find(i => i.name === item.name);
                     if (existing) {
@@ -394,7 +397,6 @@
                     }
                 },
 
-                // Thay đổi số lượng trực tiếp từ Card món
                 changeQtyDirect(item, change) {
                     let existing = this.cartItems.find(i => i.name === item.name);
                     if (existing) {
@@ -427,21 +429,29 @@
                         return;
                     }
 
-                    // Cập nhật trạng thái bàn sang "Đang phục vụ"
                     db.ref('tables/' + this.selectedTable.id).update({ status: 'serving' });
                     this.selectedTable.status = 'serving';
 
-                    // Đẩy dữ liệu order lên Firebase
                     db.ref('tableOrders/' + this.selectedTable.id).set(this.cartItems);
 
                     alert(`Đã gửi Order ${this.selectedTable.name} cho Bar/Bếp thành công!`);
                     
-                    // Tự động giải phóng dữ liệu và chuyển về Sơ đồ bàn
                     this.selectedTable = null;
                     this.cartItems = [];
                     this.view = 'tables';
                 }
             };
+        }
+    </script>
+
+    <!-- ================= ĐĂNG KÝ SERVICE WORKER CHO PWA ================= -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('PWA Service Worker registered:', reg.scope))
+                    .catch(err => console.error('PWA Service Worker failed:', err));
+            });
         }
     </script>
 </body>
