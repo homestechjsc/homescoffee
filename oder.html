@@ -49,7 +49,7 @@
                 <div class="w-14 h-14 bg-[#0072bc] text-white rounded-2xl flex items-center justify-center mx-auto mb-2 text-2xl shadow-lg shadow-blue-500/30">
                     <i class="fa-solid fa-utensils"></i>
                 </div>
-                <h2 class="font-black text-lg text-slate-800">HOMESCOFFE ORDER</h2>
+                <h2 class="font-black text-lg text-slate-800">CUKCUK ORDER</h2>
                 <p class="text-xs text-slate-400">Dành cho nhân viên phục vụ</p>
             </div>
 
@@ -72,7 +72,6 @@
     <!-- ================= 2. HEADER TOP MOBILE ================= -->
     <header class="bg-[#0072bc] text-white px-3 py-2.5 flex justify-between items-center shadow-md flex-shrink-0">
         <div class="flex items-center gap-2">
-            <!-- Nút back khi đang gọi món -->
             <button x-show="view === 'ordering'" @click="view = 'tables'" class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center active:scale-90 transition">
                 <i class="fa-solid fa-arrow-left text-sm"></i>
             </button>
@@ -83,13 +82,11 @@
         </div>
 
         <div class="flex items-center gap-2">
-            <!-- Giỏ hàng nổi khi đang gọi món -->
             <button x-show="view === 'ordering'" @click="showCartDrawer = true" class="relative px-3 py-1.5 bg-amber-500 hover:bg-amber-600 rounded-xl text-xs font-black flex items-center gap-1.5 shadow active:scale-95 transition">
                 <i class="fa-solid fa-cart-shopping"></i>
                 <span x-text="totalCartItems"></span>
             </button>
 
-            <!-- Nút đăng xuất -->
             <button @click="logout()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-red-600 text-white flex items-center justify-center transition">
                 <i class="fa-solid fa-power-off text-xs"></i>
             </button>
@@ -100,7 +97,6 @@
 
     <!-- VIEW 1: SƠ ĐỒ BÀN (TABLES) -->
     <div x-show="view === 'tables'" class="flex-1 flex flex-col overflow-hidden">
-        <!-- Thanh lọc khu vực -->
         <div class="bg-white px-3 py-2 border-b flex gap-2 overflow-x-auto hide-scrollbar flex-shrink-0">
             <button @click="selectedArea = 'Tất cả'" :class="selectedArea === 'Tất cả' ? 'bg-[#0072bc] text-white font-bold' : 'bg-slate-100 text-slate-600'" class="px-3.5 py-1.5 rounded-full text-xs whitespace-nowrap transition">
                 Tất cả
@@ -111,7 +107,6 @@
             </template>
         </div>
 
-        <!-- Lưới bàn dạng App -->
         <div class="flex-1 p-3 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-3">
             <template x-for="t in filteredTables" :key="t.id">
                 <div @click="selectTable(t)" class="bg-white rounded-2xl p-3 border-2 flex flex-col justify-between items-center text-center shadow-sm active:scale-95 transition h-28"
@@ -138,7 +133,6 @@
     <!-- VIEW 2: GỌI MÓN (ORDERING) -->
     <div x-show="view === 'ordering'" class="flex-1 flex flex-col overflow-hidden">
         
-        <!-- Thanh tìm kiếm & Nhóm danh mục -->
         <div class="bg-white border-b p-2 space-y-2 flex-shrink-0 shadow-sm">
             <div class="relative">
                 <input type="text" x-model="searchQuery" placeholder="Tìm tên món nước / đồ ăn..." class="w-full pl-8 pr-3 py-1.5 bg-slate-100 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[#0072bc]">
@@ -153,13 +147,11 @@
             </div>
         </div>
 
-        <!-- Danh sách món có nút Tăng/Giảm trực tiếp -->
         <div class="flex-1 p-2 overflow-y-auto space-y-2">
             <template x-for="m in filteredMenu" :key="m.id">
                 <div class="bg-white p-2.5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between transition"
                      :class="getItemQty(m.name) > 0 ? 'border-blue-300 bg-blue-50/20' : ''">
                     
-                    <!-- Thông tin món -->
                     <div class="flex items-center gap-2.5 flex-1 pr-2">
                         <template x-if="m.image">
                             <img :src="m.image" class="w-12 h-12 rounded-xl object-cover border flex-shrink-0">
@@ -176,7 +168,7 @@
                         </div>
                     </div>
 
-                    <!-- BỘ TĂNG GIẢM SỐ LƯỢNG TRỰC TIẾP TRÊN CARD -->
+                    <!-- NÚT TĂNG GIẢM TRỰC TIẾP -->
                     <div class="flex-shrink-0">
                         <template x-if="getItemQty(m.name) === 0">
                             <button @click="addToCart(m)" class="w-8 h-8 rounded-full bg-blue-50 text-[#0072bc] border border-blue-200 flex items-center justify-center font-bold text-sm shadow-sm active:bg-[#0072bc] active:text-white transition">
@@ -200,7 +192,7 @@
             </template>
         </div>
 
-        <!-- Thanh đáy tóm tắt Order -->
+        <!-- Thanh đáy gửi order -->
         <div class="bg-white border-t p-2.5 flex items-center justify-between shadow-lg flex-shrink-0">
             <div>
                 <p class="text-[10px] text-slate-400">TỔNG MÓN ĐÃ CHỌN:</p>
@@ -211,7 +203,7 @@
                     Xem Đơn (<span x-text="totalCartItems"></span>)
                 </button>
                 <button @click="sendOrderToKitchen()" class="px-5 py-2 bg-[#0072bc] active:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-wide shadow flex items-center gap-1.5 transition">
-                    <i class="fa-solid fa-paper-plane"></i> Báo Bar/Bếp
+                    <i class="fa-solid fa-paper-plane"></i> Gửi Yêu Cầu
                 </button>
             </div>
         </div>
@@ -253,7 +245,7 @@
             <div class="pt-2 border-t flex gap-2">
                 <button @click="showCartDrawer = false" class="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold">Thêm Món Tiếp</button>
                 <button @click="sendOrderToKitchen(); showCartDrawer = false;" class="flex-1 py-2.5 bg-emerald-600 active:bg-emerald-700 text-white rounded-xl text-xs font-black shadow flex items-center justify-center gap-1.5 transition">
-                    <i class="fa-solid fa-check"></i> Lưu & Báo Bếp
+                    <i class="fa-solid fa-check"></i> Gửi Yêu Cầu
                 </button>
             </div>
         </div>
@@ -319,9 +311,6 @@
 
                     db.ref('tableOrders').on('value', snap => {
                         this.tableOrders = snap.val() || {};
-                        if (this.selectedTable) {
-                            this.cartItems = this.tableOrders[this.selectedTable.id] || [];
-                        }
                     });
 
                     db.ref('staff').on('value', snap => {
@@ -374,7 +363,7 @@
 
                 selectTable(table) {
                     this.selectedTable = table;
-                    this.cartItems = this.tableOrders[table.id] ? JSON.parse(JSON.stringify(this.tableOrders[table.id])) : [];
+                    this.cartItems = []; // Mở đơn mới để gọi món
                     this.view = 'ordering';
                 },
 
@@ -422,6 +411,7 @@
                     return this.cartItems.reduce((sum, i) => sum + (i.price * i.qty), 0);
                 },
 
+                // Gửi vào hàng đợi pendingOrders để index.html nhận chuông và duyệt
                 sendOrderToKitchen() {
                     if (!this.selectedTable) return;
                     if (this.cartItems.length === 0) {
@@ -429,12 +419,20 @@
                         return;
                     }
 
-                    db.ref('tables/' + this.selectedTable.id).update({ status: 'serving' });
-                    this.selectedTable.status = 'serving';
+                    const pendingPayload = {
+                        tableId: this.selectedTable.id,
+                        tableName: this.selectedTable.name,
+                        area: this.selectedTable.area || '',
+                        items: this.cartItems,
+                        note: `Phục vụ (${this.currentUser ? this.currentUser.name : 'Nhân viên'}) gửi order`,
+                        status: 'pending',
+                        timestamp: new Date().toISOString()
+                    };
 
-                    db.ref('tableOrders/' + this.selectedTable.id).set(this.cartItems);
+                    // Đẩy vào node pendingOrders
+                    db.ref('pendingOrders/' + this.selectedTable.id).set(pendingPayload);
 
-                    alert(`Đã gửi Order ${this.selectedTable.name} cho Bar/Bếp thành công!`);
+                    alert(`Đã gửi yêu cầu gọi món của ${this.selectedTable.name}! Vui lòng chờ thu ngân/quản lý xác nhận.`);
                     
                     this.selectedTable = null;
                     this.cartItems = [];
