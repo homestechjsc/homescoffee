@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mở Quà May Mắn - HomesCoffee</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-[#07090e] bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.15),rgba(255,255,255,0))] min-h-screen flex items-center justify-center p-4 text-slate-100" x-data="giftApp()">
+
+    <!-- Card chính phong cách Dark Luxury -->
+    <div class="bg-slate-900/90 w-full max-w-sm rounded-[2.55rem] shadow-[0_0_60px_rgba(0,0,0,0.8)] p-6 sm:p-8 text-center space-y-6 relative overflow-hidden border border-amber-500/30 backdrop-blur-xl">
+        
+        <!-- Hiệu ứng ánh sáng nền nhẹ phía sau logo -->
+        <div class="absolute -top-24 left-1/2 -translate-x-1/2 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+        <!-- Header Logo (Bỏ khung, phóng to trực tiếp) -->
+        <div class="space-y-2 relative z-10 pt-2">
+            <div class="w-75 mx-auto flex items-center justify-center">
+                <img src="https://homestechjsc.vn/wp-content/uploads/2026/09/LOGOCAFFE.png" alt="Logo HomesCoffee" class="w-full h-auto object-contain drop-shadow-[0_4px_12px_rgba(255,255,255,0.25)] brightness-125">
+            </div>
+            <div class="space-y-0.5">
+                <p class="text-[11px] text-amber-400/80 font-medium tracking-wide uppercase">Chương trình tri ân khách hàng</p>
+            </div>
+        </div>
+        <!-- Divider sang trọng -->
+        <div class="w-16 h-[1px] bg-gradient-to-r from-transparent via-amber-500/50 to-transparent mx-auto"></div>
+
+        <!-- Trạng thái: Lỗi / Không có quyền truy cập -->
+        <template x-if="isInvalidLink">
+            <div class="space-y-4 py-4 relative z-10">
+                <div class="w-16 h-16 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-2xl flex items-center justify-center mx-auto text-2xl shadow-inner">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <h2 class="font-black text-base text-white">Liên kết không hợp lệ!</h2>
+                <p class="text-xs text-slate-400 px-2 leading-relaxed" x-text="errorMessage"></p>
+            </div>
+        </template>
+
+        <!-- Trạng thái 1: Chưa mở quà (Hợp lệ) -->
+        <!-- Trạng thái 1: Chưa mở quà (Khối hộp lập phương 3D liền mạch, sắc cạnh) -->
+        <template x-if="!isInvalidLink && !hasOpened">
+            <div class="space-y-3 py-1 relative z-10" x-data="{ isOpening: false }">
+                
+                <style>
+                    .scene-container {
+                        perspective: 900px;
+                        height: 125px;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        margin: 0 auto;
+                    }
+
+                    @keyframes cubeRotate360 {
+                        0% { transform: rotateX(-12deg) rotateY(0deg); }
+                        100% { transform: rotateX(-12deg) rotateY(360deg); }
+                    }
+
+                    .cube-3d {
+                        width: 95px;
+                        height: 95px;
+                        position: relative;
+                        transform-style: preserve-3d;
+                        animation: cubeRotate360 14s linear infinite;
+                    }
+
+                    .cube-face {
+                        position: absolute;
+                        width: 95px;
+                        height: 95px;
+                        background: linear-gradient(135deg, #090d16, #1e293b);
+                        border: 1px solid rgba(6, 182, 212, 0.7);
+                        box-shadow: inset 0 0 20px rgba(6, 182, 212, 0.15);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        backface-visibility: hidden;
+                    }
+
+                    /* Khớp chiều sâu 47.5px cho khối 95px */
+                    .face-front  { transform: rotateY(0deg) translateZ(47.5px); }
+                    .face-right  { transform: rotateY(90deg) translateZ(47.5px); }
+                    .face-back   { transform: rotateY(180deg) translateZ(47.5px); }
+                    .face-left   { transform: rotateY(-90deg) translateZ(47.5px); }
+                    .face-top    { transform: rotateX(90deg) translateZ(47.5px); background: #0e7490; }
+                    .face-bottom { transform: rotateX(-90deg) translateZ(47.5px); background: #0369a1; }
+
+                    .cube-opening {
+                        transform: scale(1.5) rotateX(45deg) rotateY(720deg) !important;
+                        opacity: 0;
+                        filter: brightness(2.5);
+                        transition: all 0.6s ease-out;
+                    }
+                </style>
+
+                <div class="relative cursor-pointer group scene-container" @click="isOpening = true; setTimeout(() => openGift(), 600)">
+                    <div class="absolute w-32 h-32 bg-cyan-500/30 rounded-full blur-2xl animate-pulse pointer-events-none"></div>
+
+                    <div :class="isOpening ? 'cube-opening' : ''" class="cube-3d transition-transform duration-500">
+                        
+                        <div class="absolute -top-4 inset-x-0 flex justify-center items-center z-30 pointer-events-none" style="transform: translateZ(48px);">
+                            <div class="text-cyan-300 text-2xl drop-shadow-[0_0_10px_rgba(6,182,212,1)]">
+                                <i class="fa-solid fa-bow-tie"></i>
+                            </div>
+                        </div>
+
+                        <div class="cube-face face-front flex-col p-1">
+                            <div class="absolute inset-y-0 w-6 bg-gradient-to-r from-cyan-500/40 via-teal-400/50 to-cyan-500/40"></div>
+                            <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-6 bg-gradient-to-b from-cyan-500/40 via-teal-400/50 to-cyan-500/40"></div>
+                            
+                            <div class="relative z-10 w-full h-full bg-slate-950/95 rounded p-1 border border-cyan-400 flex items-center justify-center shadow-inner">
+                                <img src="https://homestechjsc.vn/wp-content/uploads/2026/09/LOGOCAFFE.png" alt="Logo" class="w-full h-full object-contain brightness-125">
+                            </div>
+                        </div>
+
+                        <div class="cube-face face-right">
+                            <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-6 bg-gradient-to-b from-cyan-500/40 via-teal-400/50 to-cyan-500/40"></div>
+                            <i class="fa-solid fa-gift text-cyan-400 text-xl opacity-80 drop-shadow"></i>
+                        </div>
+
+                        <div class="cube-face face-back">
+                            <div class="absolute inset-y-0 w-6 bg-gradient-to-r from-cyan-500/40 via-teal-400/50 to-cyan-500/40"></div>
+                            <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-6 bg-gradient-to-b from-cyan-500/40 via-teal-400/50 to-cyan-500/40"></div>
+                        </div>
+
+                        <div class="cube-face face-left">
+                            <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-6 bg-gradient-to-b from-cyan-500/40 via-teal-400/50 to-cyan-500/40"></div>
+                            <i class="fa-solid fa-gift text-cyan-400 text-xl opacity-80 drop-shadow"></i>
+                        </div>
+
+                        <div class="cube-face face-top"></div>
+
+                        <div class="cube-face face-bottom"></div>
+                    </div>
+                </div>
+
+                <div class="space-y-1">
+                    <h2 class="font-black text-base text-white tracking-wide">Hộp Quà Tri Ân</h2>
+                    <p class="text-xs text-slate-400 px-2 leading-relaxed">Hóa đơn đã được xác thực. Chạm vào khối hộp 3D để mở thưởng ngay!</p>
+                </div>
+
+                <button @click="isOpening = true; setTimeout(() => openGift(), 600)" class="w-full py-3.5 bg-gradient-to-r from-cyan-500 via-teal-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black rounded-2xl text-xs uppercase tracking-[0.2em] shadow-[0_0_25px_rgba(6,182,212,0.4)] transition transform active:scale-95 border border-cyan-300/50">
+                    Mở Hộp Quà Ngay
+                </button>
+            </div>
+        </template>
+
+        <!-- Trạng thái 2: Đã mở quà thành công -->
+        <!-- Trạng thái 2: Đã mở quà (Đã tối ưu giao diện gọn gàng, sang trọng và bắt mắt) -->
+        <template x-if="hasOpened">
+            <div class="space-y-4 py-1 animate-fadeIn relative z-10">
+                
+                <!-- TRƯỜNG HỢP 1: TRÚNG QUÀ GIÁ TRỊ (Voucher, Giảm giá, Quà tặng) -->
+                <template x-if="wonPrize && wonPrize.type !== 'none' && wonPrize.value > 0 && !wonPrize.name.toLowerCase().includes('chúc may mắn')">
+                    <div class="space-y-3">
+                        <div class="relative">
+                            <div class="absolute inset-0 bg-emerald-500/20 rounded-2xl blur-xl"></div>
+                            <div class="relative w-16 h-16 bg-gradient-to-br from-emerald-400 to-teal-600 text-slate-950 rounded-2xl flex items-center justify-center mx-auto text-2xl shadow-[0_0_20px_rgba(16,185,129,0.4)] border border-emerald-300/50 animate-bounce">
+                                <i class="fa-solid fa-trophy"></i>
+                            </div>
+                        </div>
+
+                        <div class="space-y-1.5 pt-1">
+                            <span class="inline-block text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">Chúc Mừng Trúng Thưởng</span>
+                            <h2 class="font-black text-lg text-white leading-snug px-1" x-text="wonPrize.name"></h2>
+                            <p class="text-xs text-slate-400 px-2 leading-relaxed" x-text="getPrizeDescription(wonPrize)"></p>
+                        </div>
+
+                        <div class="p-4 bg-slate-950/90 border border-amber-500/40 rounded-2xl text-left space-y-2 shadow-[0_10px_25px_rgba(0,0,0,0.5)]">
+                            <div class="flex justify-between items-center">
+                                <p class="text-amber-400/90 text-[10px] uppercase font-bold tracking-wider">Mã xác nhận tại quầy:</p>
+                                <span class="text-[10px] text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">Hợp lệ</span>
+                            </div>
+                            <p class="font-mono font-black text-2xl text-amber-300 tracking-widest text-center py-1 bg-slate-900/80 rounded-xl border border-amber-500/20 shadow-inner" x-text="voucherCode"></p>
+                            <p class="text-[10px] text-slate-400 italic text-center pt-0.5">* Vui lòng chụp màn hình đưa cho thu ngân khi thanh toán.</p>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- TRƯỜNG HỢP 2: QUÀ TRI ÂN / AN ỦI -->
+                <template x-if="wonPrize && wonPrize.type === 'gift' && (wonPrize.value == 0 || !wonPrize.value)">
+                    <div class="space-y-3 py-1">
+                        <div class="w-16 h-16 bg-gradient-to-br from-cyan-400 to-blue-600 text-slate-950 rounded-2xl flex items-center justify-center mx-auto text-2xl shadow-[0_0_20px_rgba(6,182,212,0.4)] border border-cyan-300/50">
+                            <i class="fa-solid fa-gift"></i>
+                        </div>
+                        <div class="space-y-1">
+                            <span class="inline-block text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">Món Quà Tri Ân</span>
+                            <h2 class="font-black text-xl text-white pt-1" x-text="wonPrize.name"></h2>
+                            <p class="text-xs text-slate-400 px-4 leading-relaxed">Cảm ơn bạn đã đồng hành cùng HomesCoffee. Chúc bạn có những phút giây tuyệt vời!</p>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- TRƯỜNG HỢP 3: CHÚC MAY MẮN LẦN SAU -->
+                <template x-if="!wonPrize || wonPrize.type === 'none' || wonPrize.name.toLowerCase().includes('chúc may mắn')">
+                    <div class="space-y-3 py-1">
+                        <div class="w-16 h-16 bg-slate-800 text-amber-400 border border-slate-700 rounded-2xl flex items-center justify-center mx-auto text-2xl shadow-inner">
+                            <i class="fa-solid fa-face-smile-wink"></i>
+                        </div>
+                        <div class="space-y-1">
+                            <span class="inline-block text-[10px] bg-slate-800 text-slate-400 border border-slate-700 font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">Hẹn Gặp Lại Bạn</span>
+                            <h2 class="font-black text-xl text-white pt-1">Chúc may mắn lần sau!</h2>
+                            <p class="text-xs text-slate-400 px-4 leading-relaxed">Hôm nay chưa phải ngày may mắn của bạn. Đừng quên ghé HomesCoffee nhận quà ở hóa đơn tiếp theo nhé!</p>
+                        </div>
+                    </div>
+                </template>
+
+            </div>
+        </template>
+
+        <!-- Footer -->
+        <div class="pt-3 border-t border-slate-800 text-[10px] text-slate-500 relative z-10">
+            Hotline hỗ trợ: <strong class="text-slate-400">0972.023.222</strong>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCjolGY6uh5pY7CHIc0ON6m8qNSz5xJDXM",
+            authDomain: "dbcoffee-bbeaf.firebaseapp.com",
+            databaseURL: "https://dbcoffee-bbeaf-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "dbcoffee-bbeaf",
+            storageBucket: "dbcoffee-bbeaf.firebasestorage.app",
+            messagingSenderId: "118275632803",
+            appId: "1:118275632803:web:459762b6ace8d1c25ed916",
+            measurementId: "G-MHVZ55R50Y"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        function giftApp() {
+            return {
+                prizesList: [],
+                isInvalidLink: true,
+                errorMessage: 'Đang kiểm tra tính hợp lệ của mã QR...',
+                hasOpened: false,
+                wonPrize: null,
+                voucherCode: '',
+                currentToken: null,
+
+                init() {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const token = urlParams.get('token');
+
+                    if (!token) {
+                        this.isInvalidLink = true;
+                        this.errorMessage = 'Bạn không thể truy cập trực tiếp trang này nếu không có mã QR từ hóa đơn thanh toán.';
+                        return;
+                    }
+
+                    this.currentToken = token;
+
+                    db.ref('giftSessions/' + token).once('value', snap => {
+                        const sessionData = snap.val();
+                        if (!sessionData) {
+                            this.isInvalidLink = true;
+                            this.errorMessage = 'Mã QR không tồn tại hoặc đã hết hạn.';
+                            return;
+                        }
+
+                        if (sessionData.used) {
+                            this.isInvalidLink = true;
+                            this.errorMessage = 'Mã QR này đã được sử dụng để mở quà trước đó. Mỗi hóa đơn chỉ được mở 1 lần duy nhất!';
+                            return;
+                        }
+
+                        this.isInvalidLink = false;
+                        db.ref('miniGamePrizes').once('value', prizeSnap => {
+                            const d = prizeSnap.val();
+                            if (d) {
+                                this.prizesList = Object.keys(d).map(k => ({ id: k, ...d[k] })).filter(p => p.isActive);
+                            }
+                        });
+                    });
+                },
+
+                openGift() {
+                    if (this.prizesList.length === 0) {
+                        alert('Chương trình mở quà hiện chưa sẵn sàng.');
+                        return;
+                    }
+
+                    db.ref('giftSessions/' + this.currentToken).update({ used: true });
+
+                    const totalChance = this.prizesList.reduce((sum, p) => sum + Number(p.chance || 0), 0);
+                    let randomNum = Math.random() * totalChance;
+                    let accumulated = 0;
+                    let selected = this.prizesList[0];
+
+                    for (let p of this.prizesList) {
+                        accumulated += Number(p.chance || 0);
+                        if (randomNum <= accumulated) {
+                            selected = p;
+                            break;
+                        }
+                    }
+
+                    this.wonPrize = selected;
+                    this.voucherCode = 'HC' + Math.floor(100000 + Math.random() * 900000);
+                    this.hasOpened = true;
+
+                    db.ref('wonGifts').push({
+                        prizeName: selected.name,
+                        code: this.voucherCode,
+                        token: this.currentToken,
+                        timestamp: new Date().toISOString()
+                    });
+                },
+
+                getPrizeDescription(prize) {
+                    if (prize.type === 'discount') return `Bạn nhận được ưu đãi giảm ${prize.value}% cho hóa đơn tiếp theo.`;
+                    if (prize.type === 'gift') return `Bạn được tặng ngay một phần quà/topping miễn phí.`;
+                    if (prize.type === 'voucher') return `Bạn nhận được mã voucher giảm trực tiếp ${Number(prize.value).toLocaleString()}đ.`;
+                    return `Rất tiếc, chúc bạn may mắn trong lần ghé thăm tới!`;
+                }
+            }
+        }
+    </script>
+</body>
+</html>
