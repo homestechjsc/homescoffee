@@ -164,6 +164,7 @@ function cafeApp() {
     footerMessage: 'Xin cảm ơn quý khách & Hẹn gặp lại!',
     paperSize: '80mm',
     showQrPayment: true,
+    showGiftQr: true, // <--- Thêm dòng này để điều khiển bật/tắt QR mở quà
     bankCode: 'MB',
     bankAccount: '0972023222',
     bankAccountName: 'HOMES COFFEE',
@@ -251,6 +252,14 @@ function cafeApp() {
         showEditBillModal: false,
         editingBillForm: { id: null, table: '', paymentMethod: 'Tiền mặt', total: 0, note: '', discount: 0, subTotal: 0 },
 
+        // ================= CÀI ĐẶT MINI GAME & QUÀ TẶNG =================
+        miniGamePrizes: [],
+        showPrizeModal: false,
+        isEditingPrize: false,
+        prizeForm: { id: null, name: '', type: 'discount', value: 10, chance: 20, isActive: true },
+        giftVoucherCode: '',
+        appliedVoucherInfo: null,
+
         // ================= SỔ QUỸ THU CHI =================
         cashFlowList: [],
         showCashFlowModal: false,
@@ -295,7 +304,10 @@ function cafeApp() {
                     this.categories = ['Tất cả', ...d.filter(c => c !== 'Tất cả')];
                 }
             });
-
+            db.ref('miniGamePrizes').on('value', snap => {
+                const d = snap.val();
+                this.miniGamePrizes = d ? Object.keys(d).map(k => ({ id: k, ...d[k] })) : [];
+            });
             db.ref('settings/store').on('value', snap => {
                 const d = snap.val();
                 if (d) this.storeSettings = { ...this.storeSettings, ...d };
@@ -954,8 +966,13 @@ finalTotal() {
                 });
             }
 
-            // 2. Tạo đối tượng hóa đơn lưu trữ & in ấn
+            // ================= SỬA TẠO ID HÓA ĐƠN TỰ ĐỘNG TỪ FIREBASE =================
+            const newOrderRef = db.ref('orders').push();
+            const orderId = newOrderRef.key;
+
+            // 2. Tạo đối tượng hóa đơn lưu trữ & in ấn kèm ID chuẩn
             const orderData = {
+                id: orderId, // Thêm thuộc tính id để tạo mã QR mở quà chính xác
                 table: this.selectedTable.name,
                 area: this.selectedTable.area,
                 items: [...this.currentOrder.items],
@@ -963,33 +980,46 @@ finalTotal() {
                 discount: discVal,
                 total: finalAmt,
                 paymentMethod: this.paymentMethod,
-                note: this.orderNote,
+                note: this.appliedVoucherInfo ? (this.orderNote + ` [Áp dụng mã quà: ${this.appliedVoucherInfo.code}]`) : this.orderNote,
                 cashier: this.currentUser ? this.currentUser.name : 'Thu ngân',
                 timestamp: new Date().toISOString()
             };
 
-            // 3. Ghi đơn hàng lên Firebase & Reset bàn trên DB
-            db.ref('orders').push(orderData);
+            // 3. Ghi đơn hàng lên Firebase bằng .set() thay vì .push()
+            newOrderRef.set(orderData);
             db.ref('tables/' + this.selectedTable.id).update({ status: 'empty' });
             db.ref('tableOrders/' + this.selectedTable.id).remove();
+            // =========================================================================
 
-            // 4. Gửi thông báo Bot Telegram
+            // 4. Đánh dấu mã quà tặng (Voucher) đã được sử dụng trên Firebase (tránh dùng lại)
+            if (this.appliedVoucherInfo && this.appliedVoucherInfo.key) {
+                db.ref('wonGifts/' + this.appliedVoucherInfo.key).update({
+                    isUsed: true,
+                    usedAt: new Date().toISOString()
+                });
+            }
+
+            // 5. Gửi thông báo Bot Telegram
             const itemsText = orderData.items.map(i => `• ${i.qty}x ${i.name}`).join('\n');
-            const teleMsg = `💰 <b>ĐƠN HÀNG MỚI HOÀN TẤT</b>\n🏠 Quán: <b>${this.storeSettings.storeName}</b>\n🪑 Bàn: <b>${orderData.table}</b> (${orderData.area})\n💵 Tổng tiền: <b>${finalAmt.toLocaleString()}đ</b> (${orderData.paymentMethod})\n👤 Thu ngân: ${orderData.cashier}\n📋 Chi tiết:\n${itemsText}\n⏰ ${new Date().toLocaleString('vi-VN')}`;
+            const voucherText = this.appliedVoucherInfo ? `\n🎁 Mã quà tặng: <b>${this.appliedVoucherInfo.code}</b> (${this.appliedVoucherInfo.name})` : '';
+            const teleMsg = `💰 <b>ĐƠN HÀNG MỚI HOÀN TẤT</b>\n🏠 Quán: <b>${this.storeSettings.storeName}</b>\n🪑 Bàn: <b>${orderData.table}</b> (${orderData.area})\n💵 Tổng tiền: <b>${finalAmt.toLocaleString()}đ</b> (${orderData.paymentMethod})${voucherText}\n👤 Thu ngân: ${orderData.cashier}\n📋 Chi tiết:\n${itemsText}\n⏰ ${new Date().toLocaleString('vi-VN')}`;
             this.sendTelegramMessage(teleMsg);
 
-            // 5. Gán dữ liệu sang hóa đơn in & Mở modal hóa đơn
+            // 6. Gán dữ liệu sang hóa đơn in & Mở modal hóa đơn
             this.selectedBillToView = { ...orderData };
             this.showBillDetailModal = true;
             this.showPaymentModal = false;
 
-            // 6. Dọn dẹp trạng thái bàn hiện tại
+            // 7. Dọn dẹp trạng thái bàn & reset voucher tạm thời
             this.selectedTable.status = 'empty';
             this.selectedTable = null;
             this.currentOrder.items = [];
+            this.appliedVoucherInfo = null; // Xóa trạng thái voucher sau khi thanh toán xong
+            this.discountPercent = 0;
+            this.discountAmount = 0;
             this.currentTab = 'tables';
 
-            // 7. TỰ ĐỘNG IN HÓA ĐƠN THEO KHUNG IN RIÊNG (Không in cả trang web)
+            // 8. TỰ ĐỘNG IN HÓA ĐƠN THEO KHUNG IN RIÊNG
             setTimeout(() => {
                 this.printReceipt('final-bill-print-area');
             }, 300);
@@ -1661,7 +1691,7 @@ printTemporaryBill() {
             this.cashFlowForm = { ...c }; 
             this.showCashFlowModal = true; 
         },
-
+        
         saveCashFlow() {
             if (!this.cashFlowForm.amount || Number(this.cashFlowForm.amount) <= 0) {
                 alert('Vui lòng nhập số tiền hợp lệ (> 0)!');
@@ -1691,6 +1721,145 @@ printTemporaryBill() {
 
             alert(`Đã lưu phiếu ${payload.type === 'CHI' ? 'chi' : 'thu'} thành công!`);
             this.showCashFlowModal = false;
+        },
+        openPrizeModal() {
+            this.isEditingPrize = false;
+            this.prizeForm = { id: null, name: '', type: 'discount', value: 10, chance: 20, isActive: true };
+            this.showPrizeModal = true;
+        },
+
+        openEditPrizeModal(p) {
+            this.isEditingPrize = true;
+            this.prizeForm = { ...p };
+            this.showPrizeModal = true;
+        },
+
+        savePrize() {
+            if (!this.prizeForm.name.trim()) { alert('Vui lòng nhập tên phần thưởng!'); return; }
+            
+            const payload = {
+                name: this.prizeForm.name.trim(),
+                type: this.prizeForm.type, // 'discount', 'gift', 'voucher', 'none'
+                value: Number(this.prizeForm.value) || 0,
+                chance: Number(this.prizeForm.chance) || 10,
+                isActive: this.prizeForm.isActive
+            };
+
+            if (this.isEditingPrize) {
+                db.ref('miniGamePrizes/' + this.prizeForm.id).update(payload);
+            } else {
+                db.ref('miniGamePrizes').push(payload);
+            }
+
+            alert('Đã lưu cấu hình phần thưởng thành công!');
+            this.showPrizeModal = false;
+        },
+
+        deletePrize(id) {
+            if (confirm('Bạn có chắc muốn xóa phần thưởng này?')) {
+                db.ref('miniGamePrizes/' + id).remove();
+            }
+        },
+        // Hàm kiểm tra và áp dụng mã quà tặng
+        applyGiftVoucher() {
+     const code = (this.giftVoucherCode || '').trim().toUpperCase();
+    if (!code) {
+        alert('Vui lòng nhập mã quà tặng!');
+        return;
+    }
+    
+
+    // Kiểm tra mã tồn tại trên Firebase (trong nhánh wonGifts hoặc bảng quản lý voucher)
+    db.ref('wonGifts').orderByChild('code').equalTo(code).once('value', async snap => {
+        const data = snap.val();
+        if (!data) {
+            alert('Mã quà tặng không tồn tại hoặc đã hết hạn!');
+            return;
+        }
+
+        const voucherKey = Object.keys(data)[0];
+        const voucherData = data[voucherKey];
+
+        if (voucherData.isUsed) {
+            alert('Mã quà tặng này đã được sử dụng trước đó!');
+            return;
+        }
+
+        // Tìm thông tin loại quà tương ứng trong miniGamePrizes để áp dụng giá trị
+        db.ref('miniGamePrizes').once('value', prizeSnap => {
+            const prizes = prizeSnap.val();
+            let matchedPrize = null;
+            if (prizes) {
+                const prizeList = Object.values(prizes);
+                matchedPrize = prizeList.find(p => p.name === voucherData.prizeName);
+            }
+
+            this.appliedVoucherInfo = {
+                key: voucherKey,
+                code: code,
+                name: voucherData.prizeName,
+                type: matchedPrize ? matchedPrize.type : 'discount',
+                value: matchedPrize ? matchedPrize.value : 0
+            };
+
+            // Nếu là giảm giá %, tự động cập nhật mức giảm
+            if (this.appliedVoucherInfo.type === 'discount') {
+                this.discountType = 'percent';
+                this.discountPercent = this.appliedVoucherInfo.value;
+            } else if (this.appliedVoucherInfo.type === 'voucher') {
+                this.discountType = 'amount';
+                this.discountAmount = this.appliedVoucherInfo.value;
+            }
+
+            alert(`Đã áp dụng thành công mã quà tặng: ${voucherData.prizeName}!`);
+            this.giftVoucherCode = '';
+        });
+    });
+},
+
+removeGiftVoucher() {
+    this.appliedVoucherInfo = null;
+    this.discountPercent = 0;
+    this.discountAmount = 0;
+},
+// ================= ĐẶT HÀM GET GIFT QR URL TẠI ĐÂY =================
+        getGiftQrUrl(orderId) {
+            const currentUrl = window.location.href.split('?')[0].split('#')[0];
+            const basePath = currentUrl.substring(0, currentUrl.lastIndexOf('/'));
+            
+            const token = 'GIFT_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+            
+            db.ref('giftSessions/' + token).set({
+                orderId: orderId,
+                used: false,
+                createdAt: new Date().toISOString()
+            });
+
+            return `${basePath}/quatang.html?token=${token}`;
+        },
+        // ===================================================================
+        // Hàm random phần thưởng dựa trên tỷ trọng (chance) cấu hình động
+        playDynamicMiniGame() {
+            const activePrizes = this.miniGamePrizes.filter(p => p.isActive);
+            if (activePrizes.length === 0) {
+                alert('Chương trình mini game hiện chưa có phần thưởng nào đang hoạt động!');
+                return;
+            }
+
+            const totalChance = activePrizes.reduce((sum, p) => sum + Number(p.chance || 0), 0);
+            let randomNum = Math.random() * totalChance;
+            let accumulated = 0;
+            let selected = activePrizes[0];
+
+            for (let p of activePrizes) {
+                accumulated += Number(p.chance || 0);
+                if (randomNum <= accumulated) {
+                    selected = p;
+                    break;
+                }
+            }
+
+            alert(`🎉 Chúc mừng quý khách đã trúng phần quà: ${selected.name}!`);
         },
 
         deleteCashFlow(id) { 
