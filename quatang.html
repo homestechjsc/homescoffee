@@ -42,113 +42,464 @@
         </template>
 
         <!-- Trạng thái 1: Chưa mở quà (Hợp lệ) -->
-        <!-- Trạng thái 1: Chưa mở quà (Khối hộp lập phương 3D liền mạch, sắc cạnh) -->
-        <template x-if="!isInvalidLink && !hasOpened">
-            <div class="space-y-3 py-1 relative z-10" x-data="{ isOpening: false }">
-                
-                <style>
-                    .scene-container {
-                        perspective: 900px;
-                        height: 125px;
-                        display: flex;
-                        justify-content: center;
-                        align-items: center;
-                        margin: 0 auto;
-                    }
+        <!-- TRẠNG THÁI 1: CHƯA MỞ QUÀ -->
 
-                    @keyframes cubeRotate360 {
-                        0% { transform: rotateX(-12deg) rotateY(0deg); }
-                        100% { transform: rotateX(-12deg) rotateY(360deg); }
-                    }
+<template x-if="!isInvalidLink && !hasOpened">
+    <div class="relative z-10 w-full max-w-sm mx-auto px-3 py-2"
+         x-data="{ isOpening: false }">
 
-                    .cube-3d {
-                        width: 95px;
-                        height: 95px;
-                        position: relative;
-                        transform-style: preserve-3d;
-                        animation: cubeRotate360 14s linear infinite;
-                    }
+    <style>
+        /* ================================
+           PREMIUM 3D GIFT
+        ================================= */
 
-                    .cube-face {
-                        position: absolute;
-                        width: 95px;
-                        height: 95px;
-                        background: linear-gradient(135deg, #090d16, #1e293b);
-                        border: 1px solid rgba(6, 182, 212, 0.7);
-                        box-shadow: inset 0 0 20px rgba(6, 182, 212, 0.15);
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        backface-visibility: hidden;
-                    }
+        .gift-scene {
+    height: 155px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    perspective: 900px;
+}
 
-                    /* Khớp chiều sâu 47.5px cho khối 95px */
-                    .face-front  { transform: rotateY(0deg) translateZ(47.5px); }
-                    .face-right  { transform: rotateY(90deg) translateZ(47.5px); }
-                    .face-back   { transform: rotateY(180deg) translateZ(47.5px); }
-                    .face-left   { transform: rotateY(-90deg) translateZ(47.5px); }
-                    .face-top    { transform: rotateX(90deg) translateZ(47.5px); background: #0e7490; }
-                    .face-bottom { transform: rotateX(-90deg) translateZ(47.5px); background: #0369a1; }
+        .gift-glow {
+            position: absolute;
+            width: 105px;
+            height: 105px;
+            border-radius: 999px;
+            background: rgba(6, 182, 212, .18);
+            filter: blur(28px);
+            animation: giftPulse 2.8s ease-in-out infinite;
+            pointer-events: none;
+        }
 
-                    .cube-opening {
-                        transform: scale(1.5) rotateX(45deg) rotateY(720deg) !important;
-                        opacity: 0;
-                        filter: brightness(2.5);
-                        transition: all 0.6s ease-out;
-                    }
-                </style>
+        @keyframes giftPulse {
+            0%, 100% {
+                transform: scale(.88);
+                opacity: .55;
+            }
+            50% {
+                transform: scale(1.12);
+                opacity: .9;
+            }
+        }
 
-                <div class="relative cursor-pointer group scene-container" @click="isOpening = true; setTimeout(() => openGift(), 600)">
-                    <div class="absolute w-32 h-32 bg-cyan-500/30 rounded-full blur-2xl animate-pulse pointer-events-none"></div>
+        @keyframes giftRotate {
+            0% {
+                transform: rotateX(-10deg) rotateY(0deg);
+            }
+            100% {
+                transform: rotateX(-10deg) rotateY(360deg);
+            }
+        }
 
-                    <div :class="isOpening ? 'cube-opening' : ''" class="cube-3d transition-transform duration-500">
-                        
-                        <div class="absolute -top-4 inset-x-0 flex justify-center items-center z-30 pointer-events-none" style="transform: translateZ(48px);">
-                            <div class="text-cyan-300 text-2xl drop-shadow-[0_0_10px_rgba(6,182,212,1)]">
-                                <i class="fa-solid fa-bow-tie"></i>
-                            </div>
-                        </div>
+        .gift-cube {
+            width: 82px;
+            height: 82px;
+            position: relative;
+            transform-style: preserve-3d;
+            animation: giftRotate 14s linear infinite;
+            transition:
+                transform .6s cubic-bezier(.22,1,.36,1),
+                opacity .55s ease,
+                filter .55s ease;
+            z-index: 5;
+        }
 
-                        <div class="cube-face face-front flex-col p-1">
-                            <div class="absolute inset-y-0 w-6 bg-gradient-to-r from-cyan-500/40 via-teal-400/50 to-cyan-500/40"></div>
-                            <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-6 bg-gradient-to-b from-cyan-500/40 via-teal-400/50 to-cyan-500/40"></div>
-                            
-                            <div class="relative z-10 w-full h-full bg-slate-950/95 rounded p-1 border border-cyan-400 flex items-center justify-center shadow-inner">
-                                <img src="https://homestechjsc.vn/wp-content/uploads/2026/09/LOGOCAFFE.png" alt="Logo" class="w-full h-full object-contain brightness-125">
-                            </div>
-                        </div>
+        .gift-face {
+            position: absolute;
+            width: 82px;
+            height: 82px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
 
-                        <div class="cube-face face-right">
-                            <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-6 bg-gradient-to-b from-cyan-500/40 via-teal-400/50 to-cyan-500/40"></div>
-                            <i class="fa-solid fa-gift text-cyan-400 text-xl opacity-80 drop-shadow"></i>
-                        </div>
+            background:
+                linear-gradient(
+                    145deg,
+                    #080d17 0%,
+                    #111827 55%,
+                    #172033 100%
+                );
 
-                        <div class="cube-face face-back">
-                            <div class="absolute inset-y-0 w-6 bg-gradient-to-r from-cyan-500/40 via-teal-400/50 to-cyan-500/40"></div>
-                            <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-6 bg-gradient-to-b from-cyan-500/40 via-teal-400/50 to-cyan-500/40"></div>
-                        </div>
+            border: 1px solid rgba(34,211,238,.65);
 
-                        <div class="cube-face face-left">
-                            <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-6 bg-gradient-to-b from-cyan-500/40 via-teal-400/50 to-cyan-500/40"></div>
-                            <i class="fa-solid fa-gift text-cyan-400 text-xl opacity-80 drop-shadow"></i>
-                        </div>
+            box-shadow:
+                inset 0 0 18px rgba(6,182,212,.12),
+                0 0 10px rgba(6,182,212,.08);
 
-                        <div class="cube-face face-top"></div>
+            backface-visibility: hidden;
+        }
 
-                        <div class="cube-face face-bottom"></div>
-                    </div>
-                </div>
+        .gift-front  {
+            transform: rotateY(0deg) translateZ(41px);
+        }
 
-                <div class="space-y-1">
-                    <h2 class="font-black text-base text-white tracking-wide">Hộp Quà Tri Ân</h2>
-                    <p class="text-xs text-slate-400 px-2 leading-relaxed">Hóa đơn đã được xác thực. Chạm vào khối hộp 3D để mở thưởng ngay!</p>
-                </div>
+        .gift-right  {
+            transform: rotateY(90deg) translateZ(41px);
+        }
 
-                <button @click="isOpening = true; setTimeout(() => openGift(), 600)" class="w-full py-3.5 bg-gradient-to-r from-cyan-500 via-teal-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black rounded-2xl text-xs uppercase tracking-[0.2em] shadow-[0_0_25px_rgba(6,182,212,0.4)] transition transform active:scale-95 border border-cyan-300/50">
-                    Mở Hộp Quà Ngay
-                </button>
+        .gift-back   {
+            transform: rotateY(180deg) translateZ(41px);
+        }
+
+        .gift-left   {
+            transform: rotateY(-90deg) translateZ(41px);
+        }
+
+        .gift-top {
+            transform: rotateX(90deg) translateZ(41px);
+            background: linear-gradient(135deg,#155e75,#0e7490);
+        }
+
+        .gift-bottom {
+            transform: rotateX(-90deg) translateZ(41px);
+            background: #075985;
+        }
+
+        /* Dải ruy-băng */
+        .gift-ribbon-v {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            width: 15px;
+            transform: translateX(-50%);
+            background:
+                linear-gradient(
+                    90deg,
+                    rgba(6,182,212,.25),
+                    rgba(45,212,191,.75),
+                    rgba(6,182,212,.25)
+                );
+        }
+
+        .gift-ribbon-h {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 50%;
+            height: 15px;
+            transform: translateY(-50%);
+            background:
+                linear-gradient(
+                    180deg,
+                    rgba(6,182,212,.22),
+                    rgba(45,212,191,.72),
+                    rgba(6,182,212,.22)
+                );
+        }
+
+        /* Nút nơ */
+        .gift-bow {
+            position: absolute;
+            top: -18px;
+            left: 50%;
+            transform: translateX(-50%) translateZ(42px);
+            z-index: 20;
+            color: #67e8f9;
+            font-size: 21px;
+            filter:
+                drop-shadow(0 0 6px rgba(34,211,238,.9))
+                drop-shadow(0 0 15px rgba(6,182,212,.45));
+        }
+
+        /* Hiệu ứng mở */
+        .gift-opening {
+            transform:
+                scale(1.55)
+                rotateX(35deg)
+                rotateY(720deg) !important;
+
+            opacity: 0;
+            filter:
+                brightness(2.8)
+                drop-shadow(0 0 25px rgba(34,211,238,1));
+        }
+
+        /* Icon mặt bên */
+        .gift-side-icon {
+            font-size: 18px;
+            color: #22d3ee;
+            opacity: .75;
+            filter: drop-shadow(0 0 6px rgba(34,211,238,.6));
+        }
+
+        /* Card nội dung */
+        .gift-content {
+            margin-top: -1px;
+            text-align: center;
+        }
+
+        .gift-title {
+            font-size: 16px;
+            line-height: 1.2;
+            font-weight: 900;
+            letter-spacing: .03em;
+            color: #fff;
+        }
+
+        .gift-subtitle {
+            margin: 6px auto 0;
+            max-width: 310px;
+            font-size: 11px;
+            line-height: 1.55;
+            color: #94a3b8;
+        }
+
+        /* Nút */
+        .gift-button {
+            margin-top: 13px;
+            width: 100%;
+            min-height: 46px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+
+            border-radius: 15px;
+
+            background:
+                linear-gradient(
+                    100deg,
+                    #06b6d4,
+                    #14b8a6 48%,
+                    #2563eb
+                );
+
+            border: 1px solid rgba(103,232,249,.55);
+
+            color: #02131b;
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: .13em;
+
+            box-shadow:
+                0 8px 25px rgba(6,182,212,.22),
+                inset 0 1px 0 rgba(255,255,255,.3);
+
+            transition:
+                transform .2s ease,
+                box-shadow .2s ease,
+                filter .2s ease;
+        }
+
+        .gift-button:hover {
+            filter: brightness(1.08);
+            box-shadow:
+                0 10px 30px rgba(6,182,212,.35),
+                inset 0 1px 0 rgba(255,255,255,.35);
+        }
+
+        .gift-button:active {
+            transform: scale(.97);
+        }
+
+        /* Dòng xác thực */
+        .gift-verified {
+            margin-top: 9px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 5px;
+
+            font-size: 9px;
+            font-weight: 700;
+            color: #64748b;
+        }
+
+        .gift-verified i {
+            color: #22c55e;
+            font-size: 9px;
+        }
+
+        /* Mobile nhỏ */
+        @media (max-width: 380px) {
+            .gift-scene {
+                height: 125px;
+            }
+
+            .gift-cube,
+            .gift-face {
+                width: 76px;
+                height: 76px;
+            }
+
+            .gift-front {
+                transform: rotateY(0deg) translateZ(38px);
+            }
+
+            .gift-right {
+                transform: rotateY(90deg) translateZ(38px);
+            }
+
+            .gift-back {
+                transform: rotateY(180deg) translateZ(38px);
+            }
+
+            .gift-left {
+                transform: rotateY(-90deg) translateZ(38px);
+            }
+
+            .gift-top {
+                transform: rotateX(90deg) translateZ(38px);
+            }
+
+            .gift-bottom {
+                transform: rotateX(-90deg) translateZ(38px);
+            }
+
+            .gift-title {
+                font-size: 15px;
+            }
+
+            .gift-button {
+                min-height: 44px;
+            }
+        }
+    </style>
+
+
+    <!-- =========================
+         KHỐI HỘP QUÀ
+    ========================== -->
+    <div
+        class="gift-scene cursor-pointer"
+        @click="if(!isOpening){ isOpening = true; setTimeout(() => openGift(), 600) }"
+    >
+
+        <!-- Glow -->
+        <div class="gift-glow"></div>
+
+        <!-- Vòng sáng nhẹ -->
+        <div class="absolute w-20 h-20 rounded-full
+                    border border-cyan-400/10
+                    animate-ping pointer-events-none">
+        </div>
+
+        <!-- Cube -->
+        <div
+            class="gift-cube"
+            :class="isOpening ? 'gift-opening' : ''"
+        >
+
+            <!-- Nơ -->
+            <div class="gift-bow pointer-events-none">
+                <i class="fa-solid fa-bow-tie"></i>
             </div>
-        </template>
+
+
+            <!-- FRONT -->
+            <div class="gift-face gift-front overflow-hidden rounded-lg">
+
+                <div class="gift-ribbon-v"></div>
+                <div class="gift-ribbon-h"></div>
+
+                <div class="relative z-10 w-[72px] h-[72px]
+                            rounded-md overflow-hidden
+                            bg-slate-950
+                            border border-cyan-400/70
+                            flex items-center justify-center
+                            shadow-[0_0_12px_rgba(6,182,212,.15)]">
+
+                    <img
+                        src="https://homestechjsc.vn/wp-content/uploads/2026/09/LOGOCAFFE.png"
+                        alt="Logo"
+                        class="w-full h-full object-contain p-1 brightness-125"
+                    >
+                </div>
+            </div>
+
+
+            <!-- RIGHT -->
+            <div class="gift-face gift-right">
+                <div class="gift-ribbon-h"></div>
+
+                <i class="fa-solid fa-gift gift-side-icon"></i>
+            </div>
+
+
+            <!-- BACK -->
+            <div class="gift-face gift-back">
+
+                <div class="gift-ribbon-v"></div>
+                <div class="gift-ribbon-h"></div>
+
+                <i class="fa-solid fa-gift gift-side-icon"></i>
+            </div>
+
+
+            <!-- LEFT -->
+            <div class="gift-face gift-left">
+
+                <div class="gift-ribbon-h"></div>
+
+                <i class="fa-solid fa-gift gift-side-icon"></i>
+            </div>
+
+
+            <!-- TOP -->
+            <div class="gift-face gift-top rounded-lg">
+                <div class="absolute inset-0
+                            bg-gradient-to-br
+                            from-cyan-300/10
+                            to-transparent">
+                </div>
+            </div>
+
+
+            <!-- BOTTOM -->
+            <div class="gift-face gift-bottom rounded-lg"></div>
+
+        </div>
+    </div>
+
+
+    <!-- =========================
+         NỘI DUNG
+    ========================== -->
+    <div class="text-center mt-2 px-3">
+
+    <h2 class="font-black text-lg text-white tracking-wide">
+        Hộp Quà Tri Ân
+    </h2>
+
+    <p class="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+        Hóa đơn đã được xác thực. Chạm vào hộp quà để mở
+        <br>
+        thưởng ngay!
+    </p>
+
+</div>
+
+
+    <!-- =========================
+         BUTTON
+    ========================== -->
+    <button
+        @click="if(!isOpening){ isOpening = true; setTimeout(() => openGift(), 600) }"
+        :disabled="isOpening"
+        class="gift-button"
+    >
+        <i class="fa-solid fa-gift"></i>
+
+        <span>Mở Hộp Quà Ngay</span>
+
+        <i class="fa-solid fa-arrow-right text-[9px]"></i>
+    </button>
+
+
+    <!-- VERIFIED -->
+    <div class="gift-verified">
+        <i class="fa-solid fa-circle-check"></i>
+        <span>HÓA ĐƠN ĐÃ XÁC THỰC AN TOÀN</span>
+    </div>
+
+</div>
+
+</template>
+
 
         <!-- Trạng thái 2: Đã mở quà thành công -->
         <!-- Trạng thái 2: Đã mở quà (Đã tối ưu giao diện gọn gàng, sang trọng và bắt mắt) -->
