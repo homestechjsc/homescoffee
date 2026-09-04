@@ -416,6 +416,7 @@
                 <th class="p-2.5 w-14 text-center">Hình ảnh</th>
                 <th class="p-2.5">Tên món</th>
                 <th class="p-2.5">Nhóm</th>
+                <th class="p-2.5 text-center w-24">ĐVT</th>
                 <th class="p-2.5">Giá bán</th>
                 <th class="p-2.5">Định lượng</th>
                 <th class="p-2.5 text-right">Thao tác</th>
@@ -436,6 +437,7 @@
                     </td>
                     <td class="p-2.5 font-bold text-slate-800" x-text="m.name"></td>
                     <td class="p-2.5 text-slate-600"><span class="px-2 py-0.5 rounded bg-slate-100 border text-slate-700" x-text="m.category"></span></td>
+                    <td class="p-2.5 text-center font-bold text-slate-700" x-text="m.unit || 'ly'"></td>
                     <td class="p-2.5 text-[#0072bc] font-black" x-text="m.price.toLocaleString() + 'đ'"></td>
                     <td class="p-2.5 text-slate-500">
                         <template x-if="m.recipeList && m.recipeList.length > 0">
@@ -445,12 +447,10 @@
                             <span class="text-slate-400">Chưa định lượng</span>
                         </template>
                     </td>
-                    <th class="p-2.5 text-right" x-show="hasPermission(['Quản lý'])">Thao tác</th>
-<!-- Trong tbody -->
-<td class="p-2.5 text-right space-x-1" x-show="hasPermission(['Quản lý'])">
-    <button @click="openEditMenuModal(m)" class="text-blue-600 hover:text-blue-800 p-1" title="Sửa món"><i class="fa-solid fa-pen"></i></button>
-    <button @click="deleteMenuItem(m.id)" class="text-red-600 hover:text-red-800 p-1" title="Xóa món"><i class="fa-solid fa-trash"></i></button>
-</td>
+                    <td class="p-2.5 text-right space-x-1" x-show="hasPermission(['Quản lý'])">
+                        <button @click="openEditMenuModal(m)" class="text-blue-600 hover:text-blue-800 p-1" title="Sửa món"><i class="fa-solid fa-pen"></i></button>
+                        <button @click="deleteMenuItem(m.id)" class="text-red-600 hover:text-red-800 p-1" title="Xóa món"><i class="fa-solid fa-trash"></i></button>
+                    </td>
                 </tr>
             </template>
         </tbody>
@@ -1862,57 +1862,65 @@
 
     <!-- 3. MODAL THÊM / SỬA MÓN & ĐỊNH LƯỢNG -->
     <div x-show="showMenuModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm" style="display: none;">
-    <div class="bg-white w-full max-w-md p-5 rounded-xl shadow-2xl space-y-3 max-h-[90vh] overflow-y-auto">
-        <div class="flex justify-between items-center border-b pb-2">
-            <h3 class="font-bold text-slate-800 text-sm" x-text="isEditingMenu ? 'Sửa món' : 'Thêm món mới'"></h3>
-            <button @click="showMenuModal = false" class="text-slate-400"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-        <div>
-            <label class="block text-xs font-bold text-slate-600 mb-1">Tên món</label>
-            <input type="text" x-model="menuForm.name" placeholder="VD: Cà phê sữa đá..." class="w-full px-3 py-2 bg-slate-50 border rounded text-xs">
-        </div>
-        <div>
-            <label class="block text-xs font-bold text-slate-600 mb-1">Link hình ảnh (URL)</label>
-            <input type="url" x-model="menuForm.image" placeholder="https://example.com/hinh-anh.jpg" class="w-full px-3 py-2 bg-slate-50 border rounded text-xs">
-        </div>
-        <div class="grid grid-cols-2 gap-2">
-            <div>
-                <label class="block text-xs font-bold text-slate-600 mb-1">Danh mục</label>
-                <select x-model="menuForm.category" class="w-full px-3 py-2 bg-slate-50 border rounded text-xs">
-                    <template x-for="c in categories.filter(x=>x!=='Tất cả')" :key="c"><option :value="c" x-text="c"></option></template>
-                </select>
+        <div class="bg-white w-full max-w-md p-5 rounded-xl shadow-2xl space-y-3 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="font-bold text-slate-800 text-sm" x-text="isEditingMenu ? 'Sửa món' : 'Thêm món mới'"></h3>
+                <button @click="showMenuModal = false" class="text-slate-400"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div>
-                <label class="block text-xs font-bold text-slate-600 mb-1">Giá bán (VNĐ)</label>
-                <input type="number" x-model="menuForm.price" class="w-full px-3 py-2 bg-slate-50 border rounded text-xs">
+                <label class="block text-xs font-bold text-slate-600 mb-1">Tên món</label>
+                <input type="text" x-model="menuForm.name" placeholder="VD: Cà phê sữa đá..." class="w-full px-3 py-2 bg-slate-50 border rounded text-xs">
             </div>
-        </div>
-        <div class="border-t pt-2 space-y-2">
-            <div class="flex justify-between items-center">
-                <label class="text-xs font-bold text-slate-700">Định lượng Kho NVL</label>
-                <button @click="addRecipeRow()" class="px-2 py-0.5 bg-blue-50 text-[#0072bc] rounded text-[11px] font-bold">+ Thêm NVL</button>
+            <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1">Link hình ảnh (URL)</label>
+                <input type="url" x-model="menuForm.image" placeholder="https://example.com/hinh-anh.jpg" class="w-full px-3 py-2 bg-slate-50 border rounded text-xs">
             </div>
-            <div class="space-y-1.5 max-h-32 overflow-y-auto">
-                <template x-for="(recipeItem, rIdx) in menuForm.recipeList" :key="rIdx">
-                    <div class="flex items-center gap-1 bg-slate-50 p-1.5 rounded border text-xs">
-                        <select x-model="recipeItem.invId" class="flex-1 p-1 bg-white border rounded">
-                            <option value="">-- Chọn NVL --</option>
-                            <template x-for="inv in inventoryNVL" :key="inv.id">
-                                <option :value="inv.id" x-text="inv.name + ' (' + inv.unit + ')'"></option>
-                            </template>
-                        </select>
-                        <input type="number" x-model.number="recipeItem.amount" placeholder="SL" class="w-16 p-1 bg-white border rounded text-right">
-                        <button @click="removeRecipeRow(rIdx)" class="text-red-600 px-1"><i class="fa-solid fa-trash"></i></button>
-                    </div>
-                </template>
+            <div class="grid grid-cols-3 gap-2">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Danh mục</label>
+                    <select x-model="menuForm.category" class="w-full px-3 py-2 bg-slate-50 border rounded text-xs">
+                        <template x-for="c in categories.filter(x=>x!=='Tất cả')" :key="c"><option :value="c" x-text="c"></option></template>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Đơn vị tính</label>
+                    <select x-model="menuForm.unit" class="w-full px-3 py-2 bg-slate-50 border rounded text-xs font-bold">
+                        <template x-for="u in unitsList" :key="u">
+                            <option :value="u" x-text="u"></option>
+                        </template>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Giá bán (VNĐ)</label>
+                    <input type="number" x-model="menuForm.price" class="w-full px-3 py-2 bg-slate-50 border rounded text-xs font-bold text-[#0072bc]">
+                </div>
             </div>
-        </div>
-        <div class="flex justify-end gap-2 pt-2 border-t">
-            <button @click="showMenuModal = false" class="px-4 py-1.5 bg-slate-100 rounded text-xs font-bold">Hủy</button>
-            <button @click="saveMenu()" class="px-5 py-1.5 bg-[#0072bc] text-white rounded text-xs font-bold">Lưu lại</button>
+            <div class="border-t pt-2 space-y-2">
+                <div class="flex justify-between items-center">
+                    <label class="text-xs font-bold text-slate-700">Định lượng Kho NVL</label>
+                    <button @click="addRecipeRow()" class="px-2 py-0.5 bg-blue-50 text-[#0072bc] rounded text-[11px] font-bold">+ Thêm NVL</button>
+                </div>
+                <div class="space-y-1.5 max-h-32 overflow-y-auto">
+                    <template x-for="(recipeItem, rIdx) in menuForm.recipeList" :key="rIdx">
+                        <div class="flex items-center gap-1 bg-slate-50 p-1.5 rounded border text-xs">
+                            <select x-model="recipeItem.invId" class="flex-1 p-1 bg-white border rounded">
+                                <option value="">-- Chọn NVL --</option>
+                                <template x-for="inv in inventoryNVL" :key="inv.id">
+                                    <option :value="inv.id" x-text="inv.name + ' (' + inv.unit + ')'"></option>
+                                </template>
+                            </select>
+                            <input type="number" x-model.number="recipeItem.amount" placeholder="SL" class="w-16 p-1 bg-white border rounded text-right">
+                            <button @click="removeRecipeRow(rIdx)" class="text-red-600 px-1"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    </template>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2 border-t">
+                <button @click="showMenuModal = false" class="px-4 py-1.5 bg-slate-100 rounded text-xs font-bold">Hủy</button>
+                <button @click="saveMenu()" class="px-5 py-1.5 bg-[#0072bc] text-white rounded text-xs font-bold">Lưu lại</button>
+            </div>
         </div>
     </div>
-</div>
 <!-- MODAL THÊM / SỬA NHÀ CUNG CẤP -->
 <div x-show="showSupplierModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm" style="display: none;">
     <div class="bg-white w-full max-w-sm p-5 rounded-xl shadow-2xl space-y-3">
