@@ -483,153 +483,373 @@
     </div>
 
     <!-- 1. BẢNG BÁO CÁO XUẤT NHẬP TỒN -->
-    <div x-show="invSubTab === 'xnt'" class="space-y-4">
-        <div class="border rounded-lg overflow-hidden">
-            <table class="w-full text-left text-xs border-collapse">
-                <thead class="bg-slate-100 uppercase text-slate-700 font-bold border-b">
-                    <tr>
-                        <th class="p-2.5">Mặt Hàng</th>
-                        <th class="p-2.5">Phân Loại</th>
-                        <th class="p-2.5 text-center">ĐVT</th>
-                        <th class="p-2.5 text-right bg-slate-200/60">Tồn Đầu</th>
-                        <th class="p-2.5 text-right bg-emerald-50 text-emerald-800">Tổng Nhập</th>
-                        <th class="p-2.5 text-right bg-rose-50 text-rose-800">Tổng Xuất</th>
-                        <th class="p-2.5 text-right bg-blue-50 text-[#0072bc] font-black">Tồn Cuối</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y">
-                    <template x-for="row in xntReport" :key="row.id">
-                        <tr class="hover:bg-slate-50">
-                            <td class="p-2.5 font-bold text-slate-800" x-text="row.name"></td>
-                            <td class="p-2.5 text-slate-500" x-text="row.typeName"></td>
-                            <td class="p-2.5 text-center text-slate-600" x-text="row.unit"></td>
-                            <td class="p-2.5 text-right bg-slate-50 text-slate-600 font-semibold" x-text="row.initialStock"></td>
-                            <td class="p-2.5 text-right bg-emerald-50/40 font-bold text-emerald-600" x-text="'+' + row.importStock"></td>
-                            <td class="p-2.5 text-right bg-rose-50/40 font-bold text-rose-600" x-text="'-' + row.exportStock"></td>
-                            <td class="p-2.5 text-right bg-blue-50/40 font-black text-[#0072bc] text-sm" x-text="row.currentStock"></td>
-                        </tr>
-                    </template>
-                </tbody>
-            </table>
+    <div x-show="invSubTab === 'xnt'" class="space-y-3">
+    
+    <!-- Thanh tìm kiếm nhanh sản phẩm XNT -->
+    <div class="flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+        <div class="relative w-full max-w-xs">
+            <input type="text" 
+                   x-model="xntSearchKeyword" 
+                   placeholder="🔍 Nhập tên mặt hàng cần tìm..." 
+                   class="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-[#0072bc]">
+            <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-slate-400 text-xs"></i>
+        </div>
+        <div class="text-xs text-slate-500 font-semibold">
+            Hiển thị: <strong class="text-slate-800" x-text="xntReport.length"></strong> mặt hàng
         </div>
     </div>
 
-    <!-- 2. LẬP PHIẾU NHẬP KHO GẮN NHÀ CUNG CẤP -->
-    <div x-show="invSubTab === 'import'" class="space-y-4">
-        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
-            <div class="flex justify-between items-center border-b pb-2">
-                <h4 class="font-bold text-xs uppercase text-slate-700">Tạo phiếu nhập kho</h4>
-                <div class="flex gap-2">
-                    <button @click="importTab = 'nvl'; importOrder.items = []" :class="importTab === 'nvl' ? 'bg-[#0072bc] text-white font-bold' : 'bg-white border text-slate-700'" class="px-3 py-1 rounded text-xs transition">Kho Nguyên Vật Liệu</button>
-                    <button @click="importTab = 'sp'; importOrder.items = []" :class="importTab === 'sp' ? 'bg-[#0072bc] text-white font-bold' : 'bg-white border text-slate-700'" class="px-3 py-1 rounded text-xs transition">Kho Sản Phẩm</button>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1">Nhà cung cấp (*)</label>
-                    <select x-model="importOrder.supplier" class="w-full p-2 bg-white border rounded text-xs">
-                        <option value="">-- Chọn Nhà Cung Cấp --</option>
-                        <template x-for="sup in suppliersList" :key="sup.id">
-                            <option :value="sup.name" x-text="sup.name + ' (' + (sup.phone || 'Chưa có SĐT') + ')'"></option>
-                        </template>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1">Ghi chú phiếu</label>
-                    <input type="text" x-model="importOrder.note" placeholder="VD: Nhập hàng định kỳ..." class="w-full p-2 bg-white border rounded text-xs">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1">Thêm mặt hàng</label>
-                    <div class="flex gap-1.5">
-                        <select x-model="selectedImportItemId" class="flex-1 p-2 bg-white border rounded text-xs">
-                            <option value="">-- Chọn mặt hàng --</option>
-                            <template x-for="item in (importTab === 'sp' ? inventorySP : inventoryNVL)" :key="item.id">
-                                <option :value="item.id" x-text="item.name + ' (Tồn: ' + item.stock + ' ' + item.unit + ')'"></option>
-                            </template>
-                        </select>
-                        <button @click="let item = (importTab === 'sp' ? inventorySP : inventoryNVL).find(i => i.id === selectedImportItemId); if(item) { addToImportList(item); selectedImportItemId = ''; }" class="px-3 py-2 bg-[#0072bc] text-white rounded text-xs font-bold">Thêm</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Danh sách hàng trong phiếu -->
-            <div class="border rounded overflow-hidden bg-white">
-                <table class="w-full text-xs">
-                    <thead class="bg-slate-100 border-b">
-                        <tr><th class="p-2 text-left">Tên mặt hàng</th><th class="p-2 text-center w-32">Số lượng nhập</th><th class="p-2 text-center">ĐVT</th><th class="p-2 text-right">Xóa</th></tr>
-                    </thead>
-                    <tbody class="divide-y">
-                        <template x-if="importOrder.items.length === 0">
-                            <tr><td colspan="4" class="p-4 text-center text-slate-400">Chưa có món nào được chọn vào phiếu</td></tr>
-                        </template>
-                        <template x-for="(imp, idx) in importOrder.items" :key="idx">
-                            <tr>
-                                <td class="p-2 font-bold" x-text="imp.name"></td>
-                                <td class="p-2 text-center"><input type="number" x-model.number="imp.qty" min="1" class="w-20 p-1 border rounded text-center font-bold"></td>
-                                <td class="p-2 text-center text-slate-500" x-text="imp.unit"></td>
-                                <td class="p-2 text-right"><button @click="removeFromImportList(idx)" class="text-red-600"><i class="fa-solid fa-trash"></i></button></td>
-                            </tr>
-                        </template>
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="flex justify-end pt-2">
-                <button @click="confirmImportGoods()" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold transition flex items-center gap-1.5 shadow">
-                    <i class="fa-solid fa-check"></i> Xác Nhận Nhập Kho & Ghi Tồn
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 3. QUẢN LÝ NHÀ CUNG CẤP -->
-    <div x-show="invSubTab === 'suppliers'" class="space-y-4">
-        <div class="flex justify-between items-center">
-            <h4 class="font-bold text-xs uppercase text-slate-700">Danh Sách Nhà Cung Cấp Đối Tác</h4>
-            <button @click="openSupplierModal()" class="px-3 py-1.5 bg-[#0072bc] text-white rounded text-xs font-bold">+ Thêm Nhà Cung Cấp</button>
-        </div>
-        <table class="w-full text-left text-xs border">
-            <thead class="bg-slate-100 uppercase text-slate-600 font-bold border-b">
-                <tr><th class="p-2.5">Tên NCC</th><th class="p-2.5">Số điện thoại</th><th class="p-2.5">Địa chỉ</th><th class="p-2.5">Ghi chú</th><th class="p-2.5 text-right">Thao tác</th></tr>
+    <div class="border rounded-lg overflow-hidden">
+        <table class="w-full text-left text-xs border-collapse">
+            <thead class="bg-slate-100 uppercase text-slate-700 font-bold border-b">
+                <tr>
+                    <th class="p-2.5">Mặt Hàng</th>
+                    <th class="p-2.5">Phân Loại</th>
+                    <th class="p-2.5 text-center">ĐVT</th>
+                    <th class="p-2.5 text-right bg-slate-200/60">Tồn Đầu</th>
+                    <th class="p-2.5 text-right bg-emerald-50 text-emerald-800">Tổng Nhập</th>
+                    <th class="p-2.5 text-right bg-rose-50 text-rose-800">Tổng Xuất</th>
+                    <th class="p-2.5 text-right bg-blue-50 text-[#0072bc] font-black">Tồn Cuối</th>
+                    <th class="p-2.5 text-right w-20">Thao Tác</th> <!-- Thêm cột thao tác -->
+                </tr>
             </thead>
             <tbody class="divide-y">
-                <template x-for="sup in suppliersList" :key="sup.id">
+                <template x-if="xntReport.length === 0">
+                    <tr><td colspan="8" class="p-8 text-center text-slate-400">Không tìm thấy mặt hàng phù hợp với từ khóa.</td></tr>
+                </template>
+                <template x-for="row in xntReport" :key="row.id">
                     <tr class="hover:bg-slate-50">
-                        <td class="p-2.5 font-bold text-slate-800" x-text="sup.name"></td>
-                        <td class="p-2.5 text-slate-600 font-semibold" x-text="sup.phone || '---'"></td>
-                        <td class="p-2.5 text-slate-500" x-text="sup.address || '---'"></td>
-                        <td class="p-2.5 text-slate-500" x-text="sup.note || '---'"></td>
-                        <td class="p-2.5 text-right space-x-1">
-                            <button @click="openEditSupplierModal(sup)" class="text-blue-600 p-1"><i class="fa-solid fa-pen"></i></button>
-                            <button @click="deleteSupplier(sup.id)" class="text-red-600 p-1"><i class="fa-solid fa-trash"></i></button>
+                        <td class="p-2.5 font-bold text-slate-800" x-text="row.name"></td>
+                        <td class="p-2.5 text-slate-500" x-text="row.typeName"></td>
+                        <td class="p-2.5 text-center text-slate-600" x-text="row.unit"></td>
+                        <td class="p-2.5 text-right bg-slate-50 text-slate-600 font-semibold" x-text="row.initialStock"></td>
+                        <td class="p-2.5 text-right bg-emerald-50/40 font-bold text-emerald-600" x-text="'+' + row.importStock"></td>
+                        <td class="p-2.5 text-right bg-rose-50/40 font-bold text-rose-600" x-text="'-' + row.exportStock"></td>
+                        <td class="p-2.5 text-right bg-blue-50/40 font-black text-[#0072bc] text-sm" x-text="row.currentStock"></td>
+                        <!-- Nút Sửa tồn kho -->
+                        <td class="p-2.5 text-right">
+                            <button @click="openEditStockModal(row)" class="p-1.5 bg-blue-50 text-[#0072bc] hover:bg-[#0072bc] hover:text-white rounded transition" title="Sửa trực tiếp tồn kho">
+                                <i class="fa-solid fa-pen text-[11px]"></i>
+                            </button>
                         </td>
                     </tr>
                 </template>
             </tbody>
         </table>
     </div>
+</div>
 
-    <!-- 4. LỊCH SỬ PHIẾU NHẬP / XUẤT -->
-    <div x-show="invSubTab === 'history'" class="space-y-4">
-        <h4 class="font-bold text-xs uppercase text-slate-700">Lịch sử giao dịch kho</h4>
-        <div class="space-y-2">
-            <template x-for="h in inventoryHistory" :key="h.id">
-                <div class="border rounded-lg p-3 bg-slate-50 flex flex-col gap-2">
-                    <div class="flex justify-between items-center text-xs">
-                        <div class="flex items-center gap-2">
-                            <span class="px-2 py-0.5 rounded font-black text-[10px]" :class="h.type === 'NHAP' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'" x-text="h.type === 'NHAP' ? 'PHIẾU NHẬP' : 'PHIẾU XUẤT'"></span>
-                            <span class="font-bold text-slate-800" x-text="'Đối tác / Nguồn: ' + h.supplier"></span>
-                        </div>
-                        <span class="text-slate-400 text-[11px]" x-text="new Date(h.timestamp).toLocaleString()"></span>
+
+    <!-- 2. LẬP PHIẾU NHẬP KHO GẮN NHÀ CUNG CẤP -->
+    <!-- 2. NHẬP KHO ĐA NĂNG (HIỂN THỊ DANH SÁCH HOẶC FORM TẠO MỚI) -->
+    <div x-show="invSubTab === 'import'" class="space-y-4">
+        
+        <!-- TRƯỜNG HỢP 1: HIỂN THỊ DANH SÁCH PHIẾU NHẬP KHO -->
+        <template x-if="importViewMode === 'list'">
+            <div class="space-y-3">
+                <div class="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <div>
+                        <h4 class="font-bold text-xs uppercase text-slate-700">Danh Sách Phiếu Nhập Kho</h4>
+                        <p class="text-[11px] text-slate-500">Quản lý, chỉnh sửa hoặc tạo mới các phiếu nhập kho nguyên vật liệu và sản phẩm.</p>
                     </div>
-                    <div class="text-[11px] text-slate-600 flex flex-wrap gap-2">
-                        <template x-for="item in h.items">
-                            <span class="bg-white border px-2 py-0.5 rounded font-medium" x-text="item.name + ': ' + item.qty + ' ' + (item.unit || '')"></span>
-                        </template>
+                    <button @click="openCreateImportForm()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                        <i class="fa-solid fa-plus"></i> + Tạo Phiếu Nhập
+                    </button>
+                </div>
+
+                <div class="border rounded-lg overflow-hidden bg-white shadow-sm">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead class="bg-slate-100 uppercase text-slate-700 font-bold border-b">
+                            <tr>
+                                <th class="p-2.5 w-36">Thời Gian</th>
+                                <th class="p-2.5 w-40">Nhà Cung Cấp</th>
+                                <th class="p-2.5">Chi Tiết Mặt Hàng</th>
+                                <th class="p-2.5 text-right w-28">Tổng Tiền</th>
+                                <th class="p-2.5 text-center w-24">Thanh Toán</th>
+                                <th class="p-2.5 text-right w-24">Thao Tác</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y">
+                            <template x-if="inventoryHistory.filter(h => h.type === 'NHAP').length === 0">
+                                <tr><td colspan="6" class="p-8 text-center text-slate-400">Chưa có phiếu nhập kho nào được tạo.</td></tr>
+                            </template>
+                            <template x-for="h in inventoryHistory.filter(h => h.type === 'NHAP')" :key="h.id">
+                                <tr class="hover:bg-slate-50 transition">
+                                    <td class="p-2.5 whitespace-nowrap text-slate-600 font-mono text-[11px]" x-text="new Date(h.timestamp).toLocaleString('vi-VN')"></td>
+                                    <td class="p-2.5 font-bold text-slate-800" x-text="h.supplier || '---'"></td>
+                                    <td class="p-2.5">
+                                        <div class="flex flex-wrap gap-1">
+                                            <template x-for="item in (h.items || [])">
+                                                <span class="bg-slate-100 border px-1.5 py-0.5 rounded text-[10px] text-slate-700 font-medium" 
+                                                      x-text="item.name + ' (x' + item.qty + ' ' + (item.unit || '') + ')'"></span>
+                                            </template>
+                                        </div>
+                                    </td>
+                                    <td class="p-2.5 text-right font-black text-rose-600" x-text="h.totalAmount ? Number(h.totalAmount).toLocaleString() + 'đ' : '---'"></td>
+                                    <td class="p-2.5 text-center text-slate-600 font-semibold" x-text="h.paymentMethod || 'Tiền mặt'"></td>
+                                    <td class="p-2.5 text-right space-x-1 whitespace-nowrap">
+                                        <button @click="openEditImportForm(h)" class="p-1.5 bg-blue-50 text-[#0072bc] hover:bg-[#0072bc] hover:text-white rounded transition" title="Sửa phiếu">
+                                            <i class="fa-solid fa-pen text-[11px]"></i>
+                                        </button>
+                                        <button @click="deleteImportReceipt(h)" class="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded transition" title="Xóa phiếu">
+                                            <i class="fa-solid fa-trash text-[11px]"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </template>
+
+        <!-- TRƯỜNG HỢP 2: FORM TẠO / SỬA PHIẾU NHẬP KHO -->
+        <template x-if="importViewMode === 'form'">
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4 animate-fadeIn">
+                <div class="flex justify-between items-center border-b pb-2">
+                    <h4 class="font-bold text-xs uppercase text-slate-700" x-text="editingImportId ? 'Chỉnh Sửa Phiếu Nhập Kho' : 'Tạo Phiếu Nhập Kho Mới'"></h4>
+                    <button @click="importViewMode = 'list'" class="px-3 py-1 bg-slate-200 hover:bg-slate-300 rounded-lg text-xs font-bold text-slate-700 transition">
+                        &larr; Quay Lại Danh Sách
+                    </button>
+                </div>
+
+                <div class="flex gap-2">
+                    <button @click="importTab = 'nvl'; importOrder.items = []" :class="importTab === 'nvl' ? 'bg-[#0072bc] text-white font-bold' : 'bg-white border text-slate-700'" class="px-3 py-1 rounded text-xs transition">Kho Nguyên Vật Liệu</button>
+                    <button @click="importTab = 'sp'; importOrder.items = []" :class="importTab === 'sp' ? 'bg-[#0072bc] text-white font-bold' : 'bg-white border text-slate-700'" class="px-3 py-1 rounded text-xs transition">Kho Sản Phẩm</button>
+                </div>
+
+                <!-- Thông tin chung -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Nhà cung cấp (*)</label>
+                        <select x-model="importOrder.supplier" class="w-full p-2 bg-white border rounded text-xs">
+                            <option value="">-- Chọn Nhà Cung Cấp --</option>
+                            <template x-for="sup in suppliersList" :key="sup.id">
+                                <option :value="sup.name" x-text="sup.name + ' (' + (sup.phone || 'Chưa có SĐT') + ')'"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Hình thức thanh toán</label>
+                        <select x-model="importOrder.paymentMethod" class="w-full p-2 bg-white border rounded text-xs font-bold text-[#0072bc]">
+                            <option value="Tiền mặt">Tiền mặt (Trừ quỹ tiền mặt)</option>
+                            <option value="Chuyển khoản">Chuyển khoản ngân hàng</option>
+                            <option value="Công nợ">Ghi công nợ nhà cung cấp</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Ghi chú phiếu</label>
+                        <input type="text" x-model="importOrder.note" placeholder="VD: Nhập hàng định kỳ..." class="w-full p-2 bg-white border rounded text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Thêm mặt hàng</label>
+                        <div class="flex gap-1.5 relative">
+                            <div class="flex-1 relative">
+                                <input type="text" 
+                                       x-model="importSearchQuery" 
+                                       @focus="showImportDropdown = true" 
+                                       @input="showImportDropdown = true"
+                                       @click.outside="showImportDropdown = false"
+                                       placeholder="🔍 Gõ tên sản phẩm tìm nhanh..." 
+                                       class="w-full p-2 bg-white border border-slate-300 rounded text-xs focus:outline-none focus:border-[#0072bc]">
+                                
+                                <div x-show="showImportDropdown" class="absolute z-30 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-48 overflow-y-auto cukcuk-scroll">
+                                    <template x-if="filteredImportItems.length === 0">
+                                        <div class="p-2.5 text-xs text-slate-400 text-center">Không tìm thấy mặt hàng phù hợp</div>
+                                    </template>
+                                    <template x-for="item in filteredImportItems" :key="item.id">
+                                        <div @click="selectedImportItemId = item.id; importSearchQuery = item.name; showImportDropdown = false;" 
+                                             class="p-2 text-xs hover:bg-blue-50 cursor-pointer flex justify-between items-center border-b border-slate-50 last:border-none">
+                                            <span class="font-bold text-slate-800" x-text="item.name"></span>
+                                            <span class="text-[10px] text-slate-500 font-semibold" x-text="'Tồn: ' + (item.stock || 0) + ' ' + (item.unit || '')"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <button @click="let item = (importTab === 'sp' ? inventorySP : inventoryNVL).find(i => i.id === selectedImportItemId); if(item) { addToImportList({ ...item, price: 0 }); selectedImportItemId = ''; importSearchQuery = ''; } else { alert('Vui lòng chọn mặt hàng từ danh sách gợi ý!'); }" class="px-3 py-2 bg-[#0072bc] hover:bg-blue-700 text-white rounded text-xs font-bold transition">Thêm</button>
+                        </div>
                     </div>
                 </div>
-            </template>
+
+                <!-- Bảng sản phẩm trong phiếu -->
+                <div class="border rounded overflow-hidden bg-white">
+                    <table class="w-full text-xs">
+                        <thead class="bg-slate-100 border-b text-slate-700 font-bold">
+                            <tr>
+                                <th class="p-2 text-left">Tên Mặt Hàng</th>
+                                <th class="p-2 text-center w-24">Số Lượng</th>
+                                <th class="p-2 text-center w-20">ĐVT</th>
+                                <th class="p-2 text-right w-32">Đơn Giá (đ)</th>
+                                <th class="p-2 text-right w-32">Thành Tiền (đ)</th>
+                                <th class="p-2 text-center w-16">Xóa</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y">
+                            <template x-if="importOrder.items.length === 0">
+                                <tr><td colspan="6" class="p-6 text-center text-slate-400">Chưa có món nào được chọn vào phiếu nhập kho</td></tr>
+                            </template>
+                            <template x-for="(imp, idx) in importOrder.items" :key="idx">
+                                <tr>
+                                    <td class="p-2 font-bold text-slate-800" x-text="imp.name"></td>
+                                    <td class="p-2 text-center"><input type="number" x-model.number="imp.qty" min="1" class="w-20 p-1 border rounded text-center font-bold"></td>
+                                    <td class="p-2 text-center text-slate-500" x-text="imp.unit"></td>
+                                    <td class="p-2 text-right"><input type="number" x-model.number="imp.price" min="0" placeholder="0" class="w-28 p-1 border rounded text-right font-semibold"></td>
+                                    <td class="p-2 text-right font-black text-[#0072bc]" x-text="(Number(imp.qty || 0) * Number(imp.price || 0)).toLocaleString() + 'đ'"></td>
+                                    <td class="p-2 text-center"><button @click="removeFromImportList(idx)" class="text-red-600 hover:text-red-800"><i class="fa-solid fa-trash"></i></button></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Footer tổng tiền -->
+                <div class="flex flex-wrap justify-between items-center bg-white p-3 rounded-xl border border-slate-200">
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs font-bold text-slate-600 uppercase">Tổng giá trị phiếu nhập:</span>
+                        <span class="text-lg font-black text-rose-600" x-text="importTotalAmount.toLocaleString() + 'đ'"></span>
+                    </div>
+
+                    <div class="flex gap-2">
+                        <button @click="importViewMode = 'list'" class="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition">Hủy</button>
+                        <button @click="confirmImportGoods()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition flex items-center gap-2 shadow">
+                            <i class="fa-solid fa-check"></i> Lưu & Hoàn Tất Phiếu Nhập
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <!-- 3. QUẢN LÝ NHÀ CUNG CẤP -->
+    <div x-show="invSubTab === 'suppliers'" class="space-y-4">
+        <div class="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <div>
+                <h4 class="font-bold text-xs uppercase text-slate-700">Danh Sách Nhà Cung Cấp & Quản Lý Công Nợ</h4>
+                <p class="text-[11px] text-slate-500">Theo dõi tổng giá trị nhập hàng, công nợ hiện tại và thanh toán trực tiếp.</p>
+            </div>
+            <button @click="openSupplierModal()" class="px-3.5 py-1.5 bg-[#0072bc] hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                <i class="fa-solid fa-plus"></i> + Thêm Nhà Cung Cấp
+            </button>
+        </div>
+
+        <div class="border rounded-lg overflow-hidden bg-white shadow-sm">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead class="bg-slate-100 uppercase text-slate-700 font-bold border-b">
+                    <tr>
+                        <th class="p-2.5">Tên Nhà Cung Cấp</th>
+                        <th class="p-2.5">Số Điện Thoại</th>
+                        <th class="p-2.5">Địa Chỉ</th>
+                        <th class="p-2.5 text-right">Tổng Tiền Nhập</th>
+                        <th class="p-2.5 text-right">Công Nợ Hiện Tại</th>
+                        <th class="p-2.5 text-center w-32">Thanh Toán Nợ</th>
+                        <th class="p-2.5 text-right w-24">Thao Tác</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    <template x-if="suppliersWithDebt.length === 0">
+                        <tr><td colspan="7" class="p-8 text-center text-slate-400">Chưa có nhà cung cấp nào trong danh sách.</td></tr>
+                    </template>
+                    <template x-for="sup in suppliersWithDebt" :key="sup.id">
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="p-2.5 font-bold text-slate-800" x-text="sup.name"></td>
+                            <td class="p-2.5 text-slate-600 font-semibold" x-text="sup.phone || '---'"></td>
+                            <td class="p-2.5 text-slate-500 truncate max-w-xs" x-text="sup.address || '---'"></td>
+                            
+                            <!-- Tổng tiền đã nhập -->
+                            <td class="p-2.5 text-right font-bold text-slate-700" x-text="sup.totalImport.toLocaleString() + 'đ'"></td>
+                            
+                            <!-- Công nợ hiện tại -->
+                            <td class="p-2.5 text-right font-black" :class="sup.currentDebt > 0 ? 'text-rose-600' : 'text-emerald-600'" x-text="sup.currentDebt.toLocaleString() + 'đ'"></td>
+                            
+                            <!-- Nút Trả Công Nợ -->
+                            <!-- Nút Trả Công Nợ -->
+<td class="p-2.5 text-center">
+    <template x-if="sup.currentDebt > 0">
+        <button @click="openPayDebtModal(sup)" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-extrabold transition shadow-sm">
+            Trả Nợ
+        </button>
+    </template>
+    <template x-if="sup.currentDebt <= 0">
+        <span class="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Hết nợ</span>
+    </template>
+</td>
+
+                            <!-- Nút Sửa / Xóa -->
+                            <td class="p-2.5 text-right space-x-1 whitespace-nowrap">
+                                <button @click="openEditSupplierModal(sup)" class="p-1.5 bg-blue-50 text-[#0072bc] hover:bg-[#0072bc] hover:text-white rounded transition" title="Sửa thông tin">
+                                    <i class="fa-solid fa-pen text-[11px]"></i>
+                                </button>
+                                <button @click="deleteSupplier(sup.id)" class="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded transition" title="Xóa nhà cung cấp">
+                                    <i class="fa-solid fa-trash text-[11px]"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <!-- 4. LỊCH SỬ PHIẾU NHẬP / XUẤT (PHIÊN BẢN BẢNG GỌN GÀNG, DỄ QUAN SÁT) -->
+    <div x-show="invSubTab === 'history'" class="space-y-3">
+        <div class="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+            <h4 class="font-bold text-xs uppercase text-slate-700">Lịch Sử Giao Dịch Nhập / Xuất Kho</h4>
+            <span class="text-xs text-slate-500 font-semibold">Tổng số giao dịch: <strong class="text-slate-800" x-text="inventoryHistory.length"></strong> phiếu</span>
+        </div>
+
+        <div class="border rounded-lg overflow-hidden bg-white shadow-sm">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead class="bg-slate-100 uppercase text-slate-700 font-bold border-b">
+                    <tr>
+                        <th class="p-2.5 w-36">Thời Gian</th>
+                        <th class="p-2.5 text-center w-28">Loại Phiếu</th>
+                        <th class="p-2.5 w-40">Đối Tác / Nguồn</th>
+                        <th class="p-2.5">Chi Tiết Mặt Hàng</th>
+                        <th class="p-2.5 text-right w-28">Tổng Tiền</th>
+                        <th class="p-2.5 text-center w-24">Thanh Toán</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    <template x-if="inventoryHistory.length === 0">
+                        <tr><td colspan="6" class="p-8 text-center text-slate-400">Chưa có giao dịch nhập / xuất kho nào được ghi nhận.</td></tr>
+                    </template>
+                    <template x-for="h in inventoryHistory" :key="h.id">
+                        <tr class="hover:bg-slate-50 transition">
+                            <!-- Thời gian -->
+                            <td class="p-2.5 whitespace-nowrap text-slate-600 font-mono text-[11px]" x-text="new Date(h.timestamp).toLocaleString('vi-VN')"></td>
+                            
+                            <!-- Loại phiếu -->
+                            <td class="p-2.5 text-center">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-black" 
+                                      :class="h.type === 'NHAP' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'"
+                                      x-text="h.type === 'NHAP' ? 'NHẬP KHO' : 'XUẤT KHO'"></span>
+                            </td>
+
+                            <!-- Đối tác / Nguồn -->
+                            <td class="p-2.5 font-bold text-slate-800 truncate max-w-[150px]" :title="h.supplier" x-text="h.supplier || '---'"></td>
+
+                            <!-- Chi tiết mặt hàng (Hiển thị dạng thẻ badge gọn gàng) -->
+                            <td class="p-2.5">
+                                <div class="flex flex-wrap gap-1">
+                                    <template x-for="item in (h.items || [])">
+                                        <span class="bg-slate-100 border px-1.5 py-0.5 rounded text-[10px] text-slate-700 font-medium" 
+                                              x-text="item.name + ' (x' + item.qty + ' ' + (item.unit || '') + ')'"></span>
+                                    </template>
+                                </div>
+                                <template x-if="h.note">
+                                    <p class="text-[10px] text-slate-400 italic mt-0.5" x-text="'Ghi chú: ' + h.note"></p>
+                                </template>
+                            </td>
+
+                            <!-- Tổng tiền -->
+                            <td class="p-2.5 text-right font-black text-rose-600" x-text="h.totalAmount ? Number(h.totalAmount).toLocaleString() + 'đ' : '---'"></td>
+
+                            <!-- Hình thức thanh toán -->
+                            <td class="p-2.5 text-center text-slate-600 font-semibold" x-text="h.paymentMethod || 'Tiền mặt'"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
         </div>
     </div>
 
@@ -2636,7 +2856,71 @@
         </div>
     </div>
 </div>
-<!-- MODAL THÊM / SỬA PHẦN THƯỞNG MINI GAME -->
+<!-- MODAL ĐIỀU CHỈNH TỒN KHO TRỰC TIẾP -->
+<div x-show="showEditStockModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm" style="display: none;">
+    <div class="bg-white w-full max-w-sm p-5 rounded-xl shadow-2xl space-y-3">
+        <div class="flex justify-between items-center border-b pb-2">
+            <h3 class="font-bold text-slate-800 text-sm">Điều Chỉnh Tồn Kho</h3>
+            <button @click="showEditStockModal = false" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">Mặt hàng</label>
+            <input type="text" x-model="editStockForm.name" disabled class="w-full px-3 py-2 bg-slate-100 border rounded text-xs font-bold text-slate-600">
+        </div>
+        <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">Số lượng tồn kho thực tế mới (*)</label>
+            <input type="number" x-model.number="editStockForm.stock" class="w-full px-3 py-2 bg-slate-50 border rounded text-xs font-black text-[#0072bc] focus:outline-none focus:border-[#0072bc]">
+        </div>
+        <div class="flex justify-end gap-2 pt-2 border-t">
+            <button @click="showEditStockModal = false" class="px-4 py-1.5 bg-slate-100 rounded text-xs font-bold">Hủy</button>
+            <button @click="saveStockEdit()" class="px-5 py-1.5 bg-[#0072bc] hover:bg-blue-700 text-white rounded text-xs font-bold shadow-sm">Lưu Tồn Kho</button>
+        </div>
+    </div>
+</div>
+<!-- MODAL THANH TOÁN TRẢ CÔNG NỢ NHÀ CUNG CẤP -->
+<div x-show="showPayDebtModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm" style="display: none;">
+    <div class="bg-white w-full max-w-md p-5 rounded-2xl shadow-2xl space-y-3.5">
+        <div class="flex justify-between items-center border-b pb-2">
+            <h3 class="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                <i class="fa-solid fa-money-bill-wave text-emerald-600"></i> Thanh Toán Trả Công Nợ Nhà Cung Cấp
+            </h3>
+            <button @click="showPayDebtModal = false" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="bg-slate-50 p-3 rounded-xl border space-y-1 text-xs">
+            <div class="flex justify-between"><span>Nhà cung cấp:</span><strong class="text-slate-800" x-text="payDebtForm.supplierName"></strong></div>
+            <div class="flex justify-between font-bold text-rose-600">
+                <span>Công nợ hiện tại:</span>
+                <span x-text="payDebtForm.maxDebt.toLocaleString() + 'đ'"></span>
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">Số tiền thanh toán (VNĐ) (*)</label>
+            <input type="number" x-model.number="payDebtForm.amount" min="1" class="w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-black text-emerald-600 focus:outline-none focus:border-[#0072bc]">
+        </div>
+
+        <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">Hình thức thanh toán</label>
+            <select x-model="payDebtForm.paymentMethod" class="w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-bold text-[#0072bc]">
+                <option value="Tiền mặt">Tiền mặt (Trừ quỹ tiền mặt)</option>
+                <option value="Chuyển khoản">Chuyển khoản ngân hàng</option>
+            </select>
+        </div>
+
+        <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">Ghi chú phiếu chi</label>
+            <input type="text" x-model="payDebtForm.note" placeholder="VD: Trả tiền nợ đợt 1..." class="w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs">
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t">
+            <button @click="showPayDebtModal = false" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition">Hủy</button>
+            <button @click="confirmPaySupplierDebt()" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-black transition shadow-sm">
+                Xác Nhận Trả Nợ & Tạo Phiếu Chi
+            </button>
+        </div>
+    </div>
+</div>
 <!-- MODAL THÊM / SỬA PHẦN THƯỞNG MINI GAME -->
 <div x-show="showPrizeModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm" style="display: none;">
     <div class="bg-white w-full max-w-sm p-5 rounded-2xl shadow-2xl space-y-3">
@@ -2687,6 +2971,7 @@
         </div>
     </div>
 </div>
+
     <!-- File script logic -->
     <script src="admin.js"></script>
 </body>
