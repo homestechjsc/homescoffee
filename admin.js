@@ -1724,13 +1724,21 @@ printTemporaryBill() {
         },
         openPrizeModal() {
             this.isEditingPrize = false;
-            this.prizeForm = { id: null, name: '', type: 'discount', value: 10, chance: 20, isActive: true };
+            this.prizeForm = { id: null, name: '', image: '', type: 'discount', value: 10, chance: 20, isActive: true };
             this.showPrizeModal = true;
         },
 
         openEditPrizeModal(p) {
             this.isEditingPrize = true;
-            this.prizeForm = { ...p };
+            this.prizeForm = { 
+                id: p.id, 
+                name: p.name || '', 
+                image: p.image || '', 
+                type: p.type || 'discount', 
+                value: p.value || 0, 
+                chance: p.chance || 10, 
+                isActive: p.isActive !== false 
+            };
             this.showPrizeModal = true;
         },
 
@@ -1739,7 +1747,8 @@ printTemporaryBill() {
             
             const payload = {
                 name: this.prizeForm.name.trim(),
-                type: this.prizeForm.type, // 'discount', 'gift', 'voucher', 'none'
+                image: (this.prizeForm.image || '').trim(),
+                type: this.prizeForm.type, 
                 value: Number(this.prizeForm.value) || 0,
                 chance: Number(this.prizeForm.chance) || 10,
                 isActive: this.prizeForm.isActive
