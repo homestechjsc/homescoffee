@@ -1403,42 +1403,54 @@
         </div>
 
         <!-- Bảng danh sách phần thưởng -->
-        <div class="border rounded-lg overflow-hidden">
-            <table class="w-full text-left text-xs border-collapse">
-                <thead class="bg-slate-100 uppercase text-slate-700 font-bold border-b">
-                    <tr>
-                        <th class="p-2.5">Tên Phần Thưởng</th>
-                        <th class="p-2.5">Loại Quà</th>
-                        <th class="p-2.5 text-center">Giá Trị / Mức Ưu Đãi</th>
-                        <th class="p-2.5 text-center">Tỷ Lệ Trúng (Tỷ trọng)</th>
-                        <th class="p-2.5 text-center">Trạng Thái</th>
-                        <th class="p-2.5 text-right w-24">Thao Tác</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y">
-                    <template x-if="miniGamePrizes.length === 0">
-                        <tr><td colspan="6" class="p-8 text-center text-slate-400">Chưa có phần thưởng nào được cấu hình. Bấm "+ Thêm Phần Thưởng Mới" để bắt đầu.</td></tr>
-                    </template>
-                    <template x-for="p in miniGamePrizes" :key="p.id">
-                        <tr class="hover:bg-slate-50 transition">
-                            <td class="p-2.5 font-bold text-slate-800" x-text="p.name"></td>
-                            <td class="p-2.5 text-slate-600 font-semibold" x-text="p.type === 'discount' ? 'Giảm giá %' : (p.type === 'gift' ? 'Tặng món/item' : (p.type === 'voucher' ? 'Voucher tiền mặt' : 'Không trúng'))"></td>
-                            <td class="p-2.5 text-center font-bold text-[#0072bc]" x-text="p.value + (p.type === 'discount' ? '%' : 'đ')"></td>
-                            <td class="p-2.5 text-center font-mono font-bold text-amber-600" x-text="p.chance + ' điểm tỷ trọng'"></td>
-                            <td class="p-2.5 text-center">
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold"
-                                      :class="p.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'"
-                                      x-text="p.isActive ? 'Đang bật' : 'Tạm ẩn'"></span>
-                            </td>
-                            <td class="p-2.5 text-right space-x-1">
-                                <button @click="openEditPrizeModal(p)" class="p-1 text-blue-600 hover:text-blue-800" title="Sửa"><i class="fa-solid fa-pen"></i></button>
-                                <button @click="deletePrize(p.id)" class="p-1 text-red-600 hover:text-red-800" title="Xóa"><i class="fa-solid fa-trash"></i></button>
-                            </td>
-                        </tr>
-                    </template>
-                </tbody>
-            </table>
-        </div>
+        <!-- Bảng danh sách phần thưởng -->
+<div class="border rounded-lg overflow-hidden">
+    <table class="w-full text-left text-xs border-collapse">
+        <thead class="bg-slate-100 uppercase text-slate-700 font-bold border-b">
+            <tr>
+                <th class="p-2.5 w-16 text-center">Ảnh</th>
+                <th class="p-2.5">Tên Phần Thưởng</th>
+                <th class="p-2.5">Loại Quà</th>
+                <th class="p-2.5 text-center">Giá Trị / Mức Ưu Đãi</th>
+                <th class="p-2.5 text-center">Tỷ Lệ Trúng</th>
+                <th class="p-2.5 text-center">Trạng Thái</th>
+                <th class="p-2.5 text-right w-24">Thao Tác</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y">
+            <template x-if="miniGamePrizes.length === 0">
+                <tr><td colspan="7" class="p-8 text-center text-slate-400">Chưa có phần thưởng nào được cấu hình. Bấm "+ Thêm Phần Thưởng Mới" để bắt đầu.</td></tr>
+            </template>
+            <template x-for="p in miniGamePrizes" :key="p.id">
+                <tr class="hover:bg-slate-50 transition">
+                    <td class="p-2 text-center">
+                        <template x-if="p.image">
+                            <img :src="p.image" alt="" class="w-10 h-10 object-cover rounded-lg mx-auto border border-slate-200 shadow-sm">
+                        </template>
+                        <template x-if="!p.image">
+                            <div class="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center mx-auto text-slate-400 border border-slate-200">
+                                <i class="fa-solid fa-gift text-xs"></i>
+                            </div>
+                        </template>
+                    </td>
+                    <td class="p-2.5 font-bold text-slate-800" x-text="p.name"></td>
+                    <td class="p-2.5 text-slate-600 font-semibold" x-text="p.type === 'discount' ? 'Giảm giá %' : (p.type === 'gift' ? 'Tặng quà / Topping' : (p.type === 'voucher' ? 'Voucher tiền mặt' : 'Không trúng'))"></td>
+                    <td class="p-2.5 text-center font-bold text-[#0072bc]" x-text="p.value + (p.type === 'discount' ? '%' : 'đ')"></td>
+                    <td class="p-2.5 text-center font-mono font-bold text-amber-600" x-text="p.chance + ' điểm'"></td>
+                    <td class="p-2.5 text-center">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold"
+                              :class="p.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'"
+                              x-text="p.isActive ? 'Đang bật' : 'Tạm ẩn'"></span>
+                    </td>
+                    <td class="p-2.5 text-right space-x-1">
+                        <button @click="openEditPrizeModal(p)" class="p-1 text-blue-600 hover:text-blue-800" title="Sửa"><i class="fa-solid fa-pen"></i></button>
+                        <button @click="deletePrize(p.id)" class="p-1 text-red-600 hover:text-red-800" title="Xóa"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>
+            </template>
+        </tbody>
+    </table>
+</div>
     </div>
 
     <!-- 4. NHẬT KÝ THAO TÁC -->
@@ -2625,6 +2637,7 @@
     </div>
 </div>
 <!-- MODAL THÊM / SỬA PHẦN THƯỞNG MINI GAME -->
+<!-- MODAL THÊM / SỬA PHẦN THƯỞNG MINI GAME -->
 <div x-show="showPrizeModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm" style="display: none;">
     <div class="bg-white w-full max-w-sm p-5 rounded-2xl shadow-2xl space-y-3">
         <div class="flex justify-between items-center border-b pb-2">
@@ -2634,7 +2647,12 @@
 
         <div>
             <label class="block text-xs font-bold text-slate-600 mb-1">Tên phần thưởng (*)</label>
-            <input type="text" x-model="prizeForm.name" placeholder="VD: Giảm 10% đơn tiếp theo..." class="w-full px-3 py-1.5 bg-slate-50 border rounded-lg text-xs font-bold">
+            <input type="text" x-model="prizeForm.name" placeholder="VD: Tai nghe Bluetooth, Sạc nhanh..." class="w-full px-3 py-1.5 bg-slate-50 border rounded-lg text-xs font-bold">
+        </div>
+
+        <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">Link hình ảnh quà tặng (URL)</label>
+            <input type="url" x-model="prizeForm.image" placeholder="https://... (hình ảnh minh họa quà)" class="w-full px-3 py-1.5 bg-slate-50 border rounded-lg text-xs">
         </div>
 
         <div class="grid grid-cols-2 gap-2">
@@ -2656,7 +2674,6 @@
         <div>
             <label class="block text-xs font-bold text-slate-600 mb-1">Tỷ trọng trúng (Số càng cao càng dễ trúng)</label>
             <input type="number" x-model.number="prizeForm.chance" placeholder="VD: 20, 30, 50..." class="w-full px-3 py-1.5 bg-slate-50 border rounded-lg text-xs font-bold text-amber-600">
-            <p class="text-[10px] text-slate-400 mt-0.5">Hệ thống sẽ tự động cộng tổng tỷ trọng của tất cả quà để tính xác suất.</p>
         </div>
 
         <div class="flex items-center gap-2 pt-1">
