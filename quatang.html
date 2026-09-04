@@ -1,677 +1,422 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mở Quà May Mắn - HomesCoffee</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-</head>
-<body class="bg-[#07090e] bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.15),rgba(255,255,255,0))] min-h-screen flex items-center justify-center p-4 text-slate-100" x-data="giftApp()">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#07090e">
+<title>Mở Quà May Mắn - Nexa Coffee</title>
 
-    <!-- Card chính phong cách Dark Luxury -->
-    <div class="bg-slate-900/90 w-full max-w-sm rounded-[2.55rem] shadow-[0_0_60px_rgba(0,0,0,0.8)] p-6 sm:p-8 text-center space-y-6 relative overflow-hidden border border-amber-500/30 backdrop-blur-xl">
-        
-        <!-- Hiệu ứng ánh sáng nền nhẹ phía sau logo -->
-        <div class="absolute -top-24 left-1/2 -translate-x-1/2 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-        <!-- Header Logo (Bỏ khung, phóng to trực tiếp) -->
-        <div class="space-y-2 relative z-10 pt-2">
-            <div class="w-75 mx-auto flex items-center justify-center">
-                <img src="https://homestechjsc.vn/wp-content/uploads/2026/09/LOGOCAFFE.png" alt="Logo HomesCoffee" class="w-full h-auto object-contain drop-shadow-[0_4px_12px_rgba(255,255,255,0.25)] brightness-125">
-            </div>
-            <div class="space-y-0.5">
-                <p class="text-[11px] text-amber-400/80 font-medium tracking-wide uppercase">Chương trình tri ân khách hàng</p>
-            </div>
-        </div>
-        <!-- Divider sang trọng -->
-        <div class="w-16 h-[1px] bg-gradient-to-r from-transparent via-amber-500/50 to-transparent mx-auto"></div>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{overflow-x:hidden}
 
-        <!-- Trạng thái: Lỗi / Không có quyền truy cập -->
-        <template x-if="isInvalidLink">
-            <div class="space-y-4 py-4 relative z-10">
-                <div class="w-16 h-16 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-2xl flex items-center justify-center mx-auto text-2xl shadow-inner">
-                    <i class="fa-solid fa-triangle-exclamation"></i>
-                </div>
-                <h2 class="font-black text-base text-white">Liên kết không hợp lệ!</h2>
-                <p class="text-xs text-slate-400 px-2 leading-relaxed" x-text="errorMessage"></p>
-            </div>
-        </template>
-
-        <!-- Trạng thái 1: Chưa mở quà (Hợp lệ) -->
-        <!-- TRẠNG THÁI 1: CHƯA MỞ QUÀ -->
-
-<template x-if="!isInvalidLink && !hasOpened">
-    <div class="relative z-10 w-full max-w-sm mx-auto px-3 py-2"
-         x-data="{ isOpening: false }">
-
-    <style>
-        /* ================================
-           PREMIUM 3D GIFT
-        ================================= */
-
-        .gift-scene {
-    height: 155px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    perspective: 900px;
+.luxury-bg{
+ background:
+ radial-gradient(circle at 50% -10%, rgba(6,182,212,.15), transparent 40%),
+ radial-gradient(circle at 10% 85%, rgba(59,130,246,.12), transparent 35%),
+ radial-gradient(circle at 90% 75%, rgba(245,158,11,.08), transparent 35%), #07090e;
 }
-
-        .gift-glow {
-            position: absolute;
-            width: 105px;
-            height: 105px;
-            border-radius: 999px;
-            background: rgba(6, 182, 212, .18);
-            filter: blur(28px);
-            animation: giftPulse 2.8s ease-in-out infinite;
-            pointer-events: none;
-        }
-
-        @keyframes giftPulse {
-            0%, 100% {
-                transform: scale(.88);
-                opacity: .55;
-            }
-            50% {
-                transform: scale(1.12);
-                opacity: .9;
-            }
-        }
-
-        @keyframes giftRotate {
-            0% {
-                transform: rotateX(-10deg) rotateY(0deg);
-            }
-            100% {
-                transform: rotateX(-10deg) rotateY(360deg);
-            }
-        }
-
-        .gift-cube {
-            width: 82px;
-            height: 82px;
-            position: relative;
-            transform-style: preserve-3d;
-            animation: giftRotate 14s linear infinite;
-            transition:
-                transform .6s cubic-bezier(.22,1,.36,1),
-                opacity .55s ease,
-                filter .55s ease;
-            z-index: 5;
-        }
-
-        .gift-face {
-            position: absolute;
-            width: 82px;
-            height: 82px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-
-            background:
-                linear-gradient(
-                    145deg,
-                    #080d17 0%,
-                    #111827 55%,
-                    #172033 100%
-                );
-
-            border: 1px solid rgba(34,211,238,.65);
-
-            box-shadow:
-                inset 0 0 18px rgba(6,182,212,.12),
-                0 0 10px rgba(6,182,212,.08);
-
-            backface-visibility: hidden;
-        }
-
-        .gift-front  {
-            transform: rotateY(0deg) translateZ(41px);
-        }
-
-        .gift-right  {
-            transform: rotateY(90deg) translateZ(41px);
-        }
-
-        .gift-back   {
-            transform: rotateY(180deg) translateZ(41px);
-        }
-
-        .gift-left   {
-            transform: rotateY(-90deg) translateZ(41px);
-        }
-
-        .gift-top {
-            transform: rotateX(90deg) translateZ(41px);
-            background: linear-gradient(135deg,#155e75,#0e7490);
-        }
-
-        .gift-bottom {
-            transform: rotateX(-90deg) translateZ(41px);
-            background: #075985;
-        }
-
-        /* Dải ruy-băng */
-        .gift-ribbon-v {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            left: 50%;
-            width: 15px;
-            transform: translateX(-50%);
-            background:
-                linear-gradient(
-                    90deg,
-                    rgba(6,182,212,.25),
-                    rgba(45,212,191,.75),
-                    rgba(6,182,212,.25)
-                );
-        }
-
-        .gift-ribbon-h {
-            position: absolute;
-            left: 0;
-            right: 0;
-            top: 50%;
-            height: 15px;
-            transform: translateY(-50%);
-            background:
-                linear-gradient(
-                    180deg,
-                    rgba(6,182,212,.22),
-                    rgba(45,212,191,.72),
-                    rgba(6,182,212,.22)
-                );
-        }
-
-        /* Nút nơ */
-        .gift-bow {
-            position: absolute;
-            top: -18px;
-            left: 50%;
-            transform: translateX(-50%) translateZ(42px);
-            z-index: 20;
-            color: #67e8f9;
-            font-size: 21px;
-            filter:
-                drop-shadow(0 0 6px rgba(34,211,238,.9))
-                drop-shadow(0 0 15px rgba(6,182,212,.45));
-        }
-
-        /* Hiệu ứng mở */
-        .gift-opening {
-            transform:
-                scale(1.55)
-                rotateX(35deg)
-                rotateY(720deg) !important;
-
-            opacity: 0;
-            filter:
-                brightness(2.8)
-                drop-shadow(0 0 25px rgba(34,211,238,1));
-        }
-
-        /* Icon mặt bên */
-        .gift-side-icon {
-            font-size: 18px;
-            color: #22d3ee;
-            opacity: .75;
-            filter: drop-shadow(0 0 6px rgba(34,211,238,.6));
-        }
-
-        /* Card nội dung */
-        .gift-content {
-            margin-top: -1px;
-            text-align: center;
-        }
-
-        .gift-title {
-            font-size: 16px;
-            line-height: 1.2;
-            font-weight: 900;
-            letter-spacing: .03em;
-            color: #fff;
-        }
-
-        .gift-subtitle {
-            margin: 6px auto 0;
-            max-width: 310px;
-            font-size: 11px;
-            line-height: 1.55;
-            color: #94a3b8;
-        }
-
-        /* Nút */
-        .gift-button {
-            margin-top: 13px;
-            width: 100%;
-            min-height: 46px;
-
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-
-            border-radius: 15px;
-
-            background:
-                linear-gradient(
-                    100deg,
-                    #06b6d4,
-                    #14b8a6 48%,
-                    #2563eb
-                );
-
-            border: 1px solid rgba(103,232,249,.55);
-
-            color: #02131b;
-            font-size: 11px;
-            font-weight: 900;
-            letter-spacing: .13em;
-
-            box-shadow:
-                0 8px 25px rgba(6,182,212,.22),
-                inset 0 1px 0 rgba(255,255,255,.3);
-
-            transition:
-                transform .2s ease,
-                box-shadow .2s ease,
-                filter .2s ease;
-        }
-
-        .gift-button:hover {
-            filter: brightness(1.08);
-            box-shadow:
-                0 10px 30px rgba(6,182,212,.35),
-                inset 0 1px 0 rgba(255,255,255,.35);
-        }
-
-        .gift-button:active {
-            transform: scale(.97);
-        }
-
-        /* Dòng xác thực */
-        .gift-verified {
-            margin-top: 9px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 5px;
-
-            font-size: 9px;
-            font-weight: 700;
-            color: #64748b;
-        }
-
-        .gift-verified i {
-            color: #22c55e;
-            font-size: 9px;
-        }
-
-        /* Mobile nhỏ */
-        @media (max-width: 380px) {
-            .gift-scene {
-                height: 125px;
-            }
-
-            .gift-cube,
-            .gift-face {
-                width: 76px;
-                height: 76px;
-            }
-
-            .gift-front {
-                transform: rotateY(0deg) translateZ(38px);
-            }
-
-            .gift-right {
-                transform: rotateY(90deg) translateZ(38px);
-            }
-
-            .gift-back {
-                transform: rotateY(180deg) translateZ(38px);
-            }
-
-            .gift-left {
-                transform: rotateY(-90deg) translateZ(38px);
-            }
-
-            .gift-top {
-                transform: rotateX(90deg) translateZ(38px);
-            }
-
-            .gift-bottom {
-                transform: rotateX(-90deg) translateZ(38px);
-            }
-
-            .gift-title {
-                font-size: 15px;
-            }
-
-            .gift-button {
-                min-height: 44px;
-            }
-        }
-    </style>
-
-
-    <!-- =========================
-         KHỐI HỘP QUÀ
-    ========================== -->
-    <div
-        class="gift-scene cursor-pointer"
-        @click="if(!isOpening){ isOpening = true; setTimeout(() => openGift(), 600) }"
-    >
-
-        <!-- Glow -->
-        <div class="gift-glow"></div>
-
-        <!-- Vòng sáng nhẹ -->
-        <div class="absolute w-20 h-20 rounded-full
-                    border border-cyan-400/10
-                    animate-ping pointer-events-none">
-        </div>
-
-        <!-- Cube -->
-        <div
-            class="gift-cube"
-            :class="isOpening ? 'gift-opening' : ''"
-        >
-
-            <!-- Nơ -->
-            <div class="gift-bow pointer-events-none">
-                <i class="fa-solid fa-bow-tie"></i>
-            </div>
-
-
-            <!-- FRONT -->
-            <div class="gift-face gift-front overflow-hidden rounded-lg">
-
-                <div class="gift-ribbon-v"></div>
-                <div class="gift-ribbon-h"></div>
-
-                <div class="relative z-10 w-[72px] h-[72px]
-                            rounded-md overflow-hidden
-                            bg-slate-950
-                            border border-cyan-400/70
-                            flex items-center justify-center
-                            shadow-[0_0_12px_rgba(6,182,212,.15)]">
-
-                    <img
-                        src="https://homestechjsc.vn/wp-content/uploads/2026/09/LOGOCAFFE.png"
-                        alt="Logo"
-                        class="w-full h-full object-contain p-1 brightness-125"
-                    >
-                </div>
-            </div>
-
-
-            <!-- RIGHT -->
-            <div class="gift-face gift-right">
-                <div class="gift-ribbon-h"></div>
-
-                <i class="fa-solid fa-gift gift-side-icon"></i>
-            </div>
-
-
-            <!-- BACK -->
-            <div class="gift-face gift-back">
-
-                <div class="gift-ribbon-v"></div>
-                <div class="gift-ribbon-h"></div>
-
-                <i class="fa-solid fa-gift gift-side-icon"></i>
-            </div>
-
-
-            <!-- LEFT -->
-            <div class="gift-face gift-left">
-
-                <div class="gift-ribbon-h"></div>
-
-                <i class="fa-solid fa-gift gift-side-icon"></i>
-            </div>
-
-
-            <!-- TOP -->
-            <div class="gift-face gift-top rounded-lg">
-                <div class="absolute inset-0
-                            bg-gradient-to-br
-                            from-cyan-300/10
-                            to-transparent">
-                </div>
-            </div>
-
-
-            <!-- BOTTOM -->
-            <div class="gift-face gift-bottom rounded-lg"></div>
-
-        </div>
-    </div>
-
-
-    <!-- =========================
-         NỘI DUNG
-    ========================== -->
-    <div class="text-center mt-2 px-3">
-
-    <h2 class="font-black text-lg text-white tracking-wide">
-        Hộp Quà Tri Ân
-    </h2>
-
-    <p class="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
-        Hóa đơn đã được xác thực. Chạm vào hộp quà để mở
-        <br>
-        thưởng ngay!
-    </p>
-
-</div>
-
-
-    <!-- =========================
-         BUTTON
-    ========================== -->
-    <button
-        @click="if(!isOpening){ isOpening = true; setTimeout(() => openGift(), 600) }"
-        :disabled="isOpening"
-        class="gift-button"
-    >
-        <i class="fa-solid fa-gift"></i>
-
-        <span>Mở Hộp Quà Ngay</span>
-
-        <i class="fa-solid fa-arrow-right text-[9px]"></i>
-    </button>
-
-
-    <!-- VERIFIED -->
-    <div class="gift-verified">
-        <i class="fa-solid fa-circle-check"></i>
-        <span>HÓA ĐƠN ĐÃ XÁC THỰC AN TOÀN</span>
-    </div>
-
-</div>
-
+.noise{position:fixed;inset:0;pointer-events:none;opacity:.025;z-index:0}
+.card{
+ position:relative;width:100%;max-width:410px;overflow:hidden;isolation:isolate;
+ border:1px solid rgba(6,182,212,.3);border-radius:34px;
+ background:linear-gradient(145deg,rgba(15,23,42,.97),rgba(8,13,22,.98) 48%,rgba(5,7,11,.99));
+ box-shadow:0 30px 90px rgba(0,0,0,.85),0 0 70px rgba(6,182,212,.08),inset 0 1px 0 rgba(255,255,255,.07);
+}
+.top-glow{position:absolute;width:280px;height:150px;top:-90px;left:50%;transform:translateX(-50%);background:rgba(6,182,212,.18);filter:blur(55px);border-radius:50%;pointer-events:none}
+.logo{width:210px;margin:auto;display:block;filter:brightness(1.2) drop-shadow(0 7px 18px rgba(0,0,0,.6))}
+.eyebrow{display:inline-flex;align-items:center;gap:7px;margin-top:4px;padding:6px 14px;border:1px solid rgba(6,182,212,.25);border-radius:999px;background:rgba(6,182,212,.06);color:#22d3ee;font-size:9px;font-weight:900;letter-spacing:.15em;text-transform:uppercase}
+.dot{width:5px;height:5px;border-radius:50%;background:#22d3ee;box-shadow:0 0 9px #22d3ee}
+.title{margin-top:10px;font-size:25px;line-height:1.02;font-weight:950;letter-spacing:-.04em;background:linear-gradient(180deg,#ffffff,#93c5fd 48%,#22d3ee);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{margin-top:6px;color:#94a3b8;font-size:10.5px;line-height:1.55}
+.gold-line{width:90px;height:1px;margin:14px auto 0;background:linear-gradient(90deg,transparent,rgba(6,182,212,.6),transparent);position:relative}
+.gold-line:after{content:"✦";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:0 7px;background:#0b111b;color:#22d3ee;font-size:9px}
+
+/* GIFT BOX - Đồng bộ Tone Dark Luxury & Cyan/Teal (Chuẩn Nexa Coffee) */
+.gift-stage{
+ position:relative;height:300px;margin-top:2px;display:flex;align-items:center;justify-content:center;
+ perspective:900px;
+}
+.gift-shadow{
+ position:absolute;width:190px;height:30px;bottom:37px;border-radius:50%;
+ background:rgba(0,0,0,.65);filter:blur(12px);transition:.5s;
+}
+.gift{
+ position:relative;width:178px;height:156px;transform-style:preserve-3d;transform:translateY(8px);
+ transition:transform .25s ease,filter .25s ease;
+}
+.box-body{
+ position:absolute;left:16px;right:16px;bottom:0;height:112px;border-radius:7px 7px 17px 17px;
+ background:linear-gradient(90deg,#091a2a 0%,#0e2a47 24%,#164e63 48%,#0b253f 76%,#061320 100%);
+ border:2px solid rgba(34,211,238,.65);
+ box-shadow:inset 12px 0 18px rgba(0,0,0,.3),inset -12px 0 18px rgba(0,0,0,.35),0 20px 35px rgba(0,0,0,.4);
+}
+.box-body:before{
+ content:"";position:absolute;top:0;bottom:0;left:50%;width:29px;transform:translateX(-50%);
+ background:linear-gradient(90deg,#d8a72e,#ffe58b 50%,#b47d18);
+ box-shadow:0 0 14px rgba(255,205,70,.2);
+}
+.box-front{
+ position:absolute;left:16px;right:16px;bottom:0;height:112px;border-radius:7px 7px 17px 17px;
+ background:linear-gradient(180deg,rgba(255,255,255,.08),transparent 35%,rgba(0,0,0,.15));
+ pointer-events:none;
+}
+.lid{
+ position:absolute;left:5px;right:5px;top:33px;height:45px;border-radius:8px;
+ background:linear-gradient(90deg,#0c2238,#133b5c 28%,#1e40af 50%,#102c46 72%,#081827);
+ border:2px solid rgba(34,211,238,.75);
+ box-shadow:0 10px 20px rgba(0,0,0,.4),inset 0 4px 8px rgba(255,255,255,.12);
+ transform-origin:20% 90%;z-index:5;transition:transform .8s cubic-bezier(.2,.9,.25,1),top .8s ease,opacity .35s;
+}
+.lid:before{
+ content:"";position:absolute;left:50%;top:0;bottom:-2px;width:29px;transform:translateX(-50%);
+ background:linear-gradient(90deg,#d8a72e,#ffe58b 50%,#b47d18);
+}
+.lid:after{
+ content:"";position:absolute;inset:7px;border:1px dashed rgba(255,230,145,.35);border-radius:5px;
+}
+.ribbon-v{
+ position:absolute;z-index:7;left:50%;top:29px;width:25px;height:118px;transform:translateX(-50%);
+ background:linear-gradient(90deg,#d8a72e,#ffe58b 50%,#b47d18);border-radius:3px;box-shadow:0 0 12px rgba(255,210,75,.2);
+}
+.bow{position:absolute;z-index:9;left:50%;top:8px;transform:translateX(-50%);width:88px;height:42px}
+.bow:before,.bow:after{content:"";position:absolute;top:6px;width:43px;height:29px;background:linear-gradient(145deg,#f4ca58,#a97113);border:1px solid #ffe39a}
+.bow:before{left:0;border-radius:80% 25% 65% 40%;transform:rotate(14deg)}
+.bow:after{right:0;border-radius:25% 80% 40% 65%;transform:rotate(-14deg)}
+.bow i{position:absolute;z-index:2;left:34px;top:10px;width:21px;height:21px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff0a6,#c38b1d 60%,#7c4e0b);border:1px solid #ffe7a0;box-shadow:0 2px 7px rgba(0,0,0,.5)}
+.box-seal{position:absolute;z-index:8;left:50%;bottom:31px;transform:translateX(-50%);width:55px;height:55px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 35% 25%,#fff0a5,#d59b23 58%,#7d5010);border:2px solid #ffe8a0;color:#7a4c08;font-size:20px;box-shadow:0 5px 12px rgba(0,0,0,.4)}
+.inner-glow{position:absolute;z-index:2;left:50%;top:48px;width:120px;height:85px;transform:translateX(-50%);border-radius:50%;background:rgba(34,211,238,.0);filter:blur(25px);transition:.4s}
+.torn-paper{position:absolute;z-index:10;left:28px;right:28px;top:74px;height:20px;opacity:0;background:linear-gradient(90deg,transparent,#a5f3fc,transparent);filter:blur(1px);clip-path:polygon(0 40%,7% 0,15% 55%,25% 12%,34% 65%,44% 8%,54% 58%,64% 15%,75% 68%,85% 5%,94% 60%,100% 20%,100% 100%,0 100%);transition:.3s}
+
+/* STATES */
+.gift.stage1{animation:softFloat 2.4s ease-in-out infinite}
+.gift.running{animation:shakeSequence 3.15s cubic-bezier(.4,0,.2,1) both}.gift.running .lid{animation:lidLift 3.15s ease both}.gift.running .bow{animation:bowAway 3.15s ease both}.gift.running .inner-glow{animation:glowBuild 3.15s ease both}.gift.running .box-seal{animation:sealTear 2.35s ease both}.gift.running .torn-paper{animation:tornBurst 2.45s ease both}
+.gift.open .lid{transform:translate(-28px,-105px) rotate(-24deg);top:27px}
+.gift.open .bow{animation:bowAway .65s forwards}
+.gift.open .inner-glow{background:rgba(34,211,238,.85);width:170px;height:125px}
+.gift.open .torn-paper{opacity:1;animation:torn .45s ease-out}
+.gift.open .box-seal{animation:sealPop .45s forwards}
+.gift.open .box-body{box-shadow:inset 12px 0 18px rgba(0,0,0,.3),inset -12px 0 18px rgba(0,0,0,.35),0 0 35px rgba(34,211,238,.45)}
+.stage-text{text-align:center;min-height:45px}
+.stage-kicker{font-size:9px;font-weight:900;letter-spacing:.15em;color:#22d3ee;text-transform:uppercase}
+.stage-instruction{margin-top:4px;font-size:11px;color:#94a3b8;line-height:1.45}
+
+/* BUTTON */
+.open-btn{
+ position:relative;width:100%;min-height:54px;overflow:hidden;border-radius:17px;border:1px solid rgba(255,255,255,.2);
+ background:linear-gradient(110deg,#0e7490,#22d3ee 45%,#2563eb);color:#041118;font-size:11px;font-weight:950;letter-spacing:.12em;
+ box-shadow:0 9px 25px rgba(6,182,212,.3),inset 0 1px 0 rgba(255,255,255,.55);transition:.15s;
+}
+.open-btn:before{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 20%,rgba(255,255,255,.5) 48%,transparent 72%);transform:translateX(-120%);animation:shineBtn 3s ease-in-out infinite}
+.open-btn:active{transform:scale(.97)}
+.open-btn:disabled{opacity:.7}
+.btn-content{position:relative;z-index:2;display:flex;align-items:center;justify-content:center;gap:9px}
+.btn-icon{width:26px;height:26px;border-radius:8px;background:rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;color:#fff}
+
+/* RESULT */
+.result{animation:fadeUp .5s ease both;text-align:center}
+.result-icon{position:relative;width:100px;height:100px;margin:2px auto 8px}
+.result-icon img{position:relative;width:92px;height:92px;object-fit:cover;border-radius:27px;border:2px solid #34d399;box-shadow:0 0 30px rgba(52,211,153,.25)}
+.trophy{position:relative;width:80px;height:80px;margin:10px auto;border-radius:24px;display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,#22d3ee,#0891b2);color:#041118;font-size:29px;box-shadow:0 0 30px rgba(34,211,238,.3);animation:float 2s ease-in-out infinite}
+.badge{display:inline-flex;gap:6px;align-items:center;padding:6px 11px;border-radius:999px;font-size:9px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
+.result-title{margin-top:8px;color:#fff;font-size:20px;line-height:1.18;font-weight:950}
+.result-desc{margin-top:5px;color:#94a3b8;font-size:10.5px;line-height:1.55}
+.voucher{position:relative;margin-top:14px;padding:14px;border-radius:19px;text-align:left;border:1px solid rgba(6,182,212,.35);background:linear-gradient(145deg,rgba(15,23,42,.98),rgba(6,10,17,.98));box-shadow:0 12px 30px rgba(0,0,0,.4)}
+.voucher:before,.voucher:after{content:"";position:absolute;top:48%;width:13px;height:26px;background:#07090e;border-radius:50%}
+.voucher:before{left:-7px}.voucher:after{right:-7px}
+.vh{display:flex;justify-content:space-between;align-items:center}.vl{color:#22d3ee;font-size:8px;font-weight:900;letter-spacing:.11em;text-transform:uppercase}.valid{padding:3px 7px;border-radius:999px;color:#34d399;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.18);font-size:7.5px;font-weight:850}
+.code{margin-top:9px;padding:10px;text-align:center;color:#67e8f9;font-family:ui-monospace,monospace;font-size:24px;font-weight:950;letter-spacing:.15em;background:rgba(0,0,0,.35);border:1px solid rgba(6,182,212,.2);border-radius:13px;text-shadow:0 0 18px rgba(6,182,212,.3)}
+.note{margin-top:7px;color:#64748b;text-align:center;font-size:8.5px;line-height:1.4}
+.luck-icon{width:78px;height:78px;margin:8px auto;border-radius:24px;display:flex;align-items:center;justify-content:center;color:#22d3ee;background:linear-gradient(145deg,rgba(6,182,212,.12),rgba(255,255,255,.02));border:1px solid rgba(6,182,212,.18);font-size:28px}
+
+/* CONFETTI */
+.confetti{position:fixed;z-index:100;left:50%;top:50%;width:7px;height:13px;opacity:0;pointer-events:none}
+.confetti.fire{animation:confetti 1.25s cubic-bezier(.15,.8,.3,1) forwards}
+.footer{margin-top:15px;padding-top:11px;border-top:1px solid rgba(255,255,255,.055);color:#475569;text-align:center;font-size:8.5px}.footer strong{color:#94a3b8}
+.invalid{padding:30px 8px;text-align:center}.invalid-icon{width:68px;height:68px;margin:auto;border-radius:21px;display:flex;align-items:center;justify-content:center;color:#fb7185;background:rgba(244,63,94,.07);border:1px solid rgba(244,63,94,.2);font-size:24px}
+
+@keyframes softFloat{0%,100%{transform:translateY(8px) rotateX(0)}50%{transform:translateY(0) rotateX(1deg)}}
+@keyframes shakeSequence{0%,12%{transform:translateY(8px)}16%{transform:translate(-4px,8px) rotate(-1deg)}20%{transform:translate(4px,8px) rotate(1deg)}28%{transform:translate(0,8px)}36%{transform:translate(-8px,8px) rotate(-2deg)}44%{transform:translate(9px,8px) rotate(2deg)}52%{transform:translate(-11px,8px) rotate(-3deg)}60%{transform:translate(11px,8px) rotate(3deg)}68%{transform:translate(-8px,8px) rotate(-2deg)}74%{transform:translate(7px,8px) rotate(2deg)}79%{transform:translate(0,8px) scale(1.02)}84%{transform:translate(-3px,2px) rotate(-2deg) scale(1.04)}90%{transform:translate(3px,-2px) rotate(2deg) scale(1.03)}100%{transform:translate(0,-5px) scale(1.02)}}@keyframes glowBuild{0%,45%{opacity:.1;background:rgba(34,211,238,.08)}65%{opacity:.45;background:rgba(34,211,238,.35)}82%{opacity:.8;background:rgba(34,211,238,.7)}100%{opacity:1;background:rgba(34,211,238,.95)}}@keyframes sealTear{0%,64%{transform:translateX(-50%) scale(1);opacity:1}72%{transform:translateX(-50%) rotate(-10deg) scale(1.05)}78%{transform:translateX(-50%) rotate(12deg) scale(.9)}84%,100%{transform:translate(-50%,24px) scale(.15);opacity:0}}@keyframes tornBurst{0%,68%{opacity:0;transform:scaleX(.1)}76%{opacity:1;transform:scaleX(.7)}100%{opacity:1;transform:scaleX(1)}}@keyframes lidLift{0%,72%{transform:rotate(0);top:33px}82%{transform:translate(-5px,-8px) rotate(-3deg);top:30px}92%{transform:translate(-16px,-45px) rotate(-13deg);top:25px}100%{transform:translate(-28px,-105px) rotate(-24deg);top:27px}}@keyframes bowAway{to{transform:translate(-50%,-125px) rotate(18deg);opacity:0}}
+@keyframes torn{0%{transform:scaleX(.2);opacity:0}100%{transform:scaleX(1);opacity:1}}
+@keyframes sealPop{to{transform:translate(-50%,20px) scale(.2);opacity:0}}
+@keyframes shineBtn{0%,55%{transform:translateX(-120%)}75%,100%{transform:translateX(120%)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes confetti{0%{opacity:1;transform:translate(0,0) rotate(0) scale(1)}100%{opacity:0;transform:translate(var(--x),var(--y)) rotate(var(--r)) scale(.7)}}
+@media(max-width:380px){.card{border-radius:29px}.logo{width:185px}.title{font-size:22px}.gift-stage{height:280px}.gift{transform:scale(.92) translateY(8px)}.gift.open{transform:scale(.92)}.code{font-size:21px}}</style>
+</head>
+
+<body class="luxury-bg min-h-screen flex items-center justify-center p-3 sm:p-5 text-slate-100" x-data="giftGameApp()">
+<div class="noise"></div>
+
+<main class="card p-5 sm:p-6 relative z-10">
+<div class="top-glow"></div>
+
+<header class="relative z-10 text-center">
+<img src="https://homestechjsc.vn/wp-content/uploads/2026/09/LOGOCAFFE.png" alt="Nexa Coffee" class="logo">
+<div class="eyebrow"><span class="dot"></span> Chúc Bạn May Mắn</div>
+<h1 class="title">HỘP QUÀ TRI ÂN</h1>
+<p class="sub">Một món quà nhỏ thay lời cảm ơn<br>Nexa Coffee gửi đến bạn</p>
+<div class="gold-line"></div>
+</header>
+
+<!-- INVALID -->
+<template x-if="isInvalidLink">
+<section class="invalid relative z-10">
+<div class="invalid-icon"><i class="fa-solid fa-link-slash"></i></div>
+<h2 class="mt-4 text-base font-black text-white">Liên kết không hợp lệ</h2>
+<p class="mt-2 px-3 text-[10px] leading-relaxed text-slate-400" x-text="errorMessage"></p>
+</section>
 </template>
 
+<!-- OPENING EXPERIENCE -->
+<template x-if="!isInvalidLink && !hasOpened">
+<section class="relative z-10 animate-fade">
 
-        <!-- Trạng thái 2: Đã mở quà thành công -->
-        <!-- Trạng thái 2: Đã mở quà (Đã tối ưu giao diện gọn gàng, sang trọng và bắt mắt) -->
-        <template x-if="hasOpened">
-            <div class="space-y-4 py-1 animate-fadeIn relative z-10">
-                
-                <!-- TRƯỜNG HỢP 1: TRÚNG QUÀ GIÁ TRỊ (Voucher, Giảm giá, Quà tặng) -->
-                <template x-if="wonPrize && wonPrize.type !== 'none' && wonPrize.value > 0 && !wonPrize.name.toLowerCase().includes('chúc may mắn')">
-                    <div class="space-y-3">
-                        <div class="relative">
-                            <div class="absolute inset-0 bg-emerald-500/20 rounded-2xl blur-xl"></div>
-                            <div class="relative w-16 h-16 bg-gradient-to-br from-emerald-400 to-teal-600 text-slate-950 rounded-2xl flex items-center justify-center mx-auto text-2xl shadow-[0_0_20px_rgba(16,185,129,0.4)] border border-emerald-300/50 animate-bounce">
-                                <i class="fa-solid fa-trophy"></i>
-                            </div>
-                        </div>
+<div class="gift-stage">
+<div class="gift-shadow" :style="isExecuting ? 'transform:scale(.8);opacity:.35' : ''"></div>
 
-                        <div class="space-y-1.5 pt-1">
-                            <span class="inline-block text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">Chúc Mừng Trúng Thưởng</span>
-                            <h2 class="font-black text-lg text-white leading-snug px-1" x-text="wonPrize.name"></h2>
-                            <p class="text-xs text-slate-400 px-2 leading-relaxed" x-text="getPrizeDescription(wonPrize)"></p>
-                        </div>
+<div class="gift"
+     :class="{
+       'stage1': !isExecuting && !openingComplete,
+       'running': isExecuting && !openingComplete,
+       'open': openingComplete
+     }">
 
-                        <div class="p-4 bg-slate-950/90 border border-amber-500/40 rounded-2xl text-left space-y-2 shadow-[0_10px_25px_rgba(0,0,0,0.5)]">
-                            <div class="flex justify-between items-center">
-                                <p class="text-amber-400/90 text-[10px] uppercase font-bold tracking-wider">Mã xác nhận tại quầy:</p>
-                                <span class="text-[10px] text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">Hợp lệ</span>
-                            </div>
-                            <p class="font-mono font-black text-2xl text-amber-300 tracking-widest text-center py-1 bg-slate-900/80 rounded-xl border border-amber-500/20 shadow-inner" x-text="voucherCode"></p>
-                            <p class="text-[10px] text-slate-400 italic text-center pt-0.5">* Vui lòng chụp màn hình đưa cho thu ngân khi thanh toán.</p>
-                        </div>
-                    </div>
-                </template>
+<div class="inner-glow"></div>
+<div class="torn-paper"></div>
 
-                <!-- TRƯỜNG HỢP 2: QUÀ TRI ÂN / AN ỦI -->
-                <template x-if="wonPrize && wonPrize.type === 'gift' && (wonPrize.value == 0 || !wonPrize.value)">
-                    <div class="space-y-3 py-1">
-                        <div class="w-16 h-16 bg-gradient-to-br from-cyan-400 to-blue-600 text-slate-950 rounded-2xl flex items-center justify-center mx-auto text-2xl shadow-[0_0_20px_rgba(6,182,212,0.4)] border border-cyan-300/50">
-                            <i class="fa-solid fa-gift"></i>
-                        </div>
-                        <div class="space-y-1">
-                            <span class="inline-block text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">Món Quà Tri Ân</span>
-                            <h2 class="font-black text-xl text-white pt-1" x-text="wonPrize.name"></h2>
-                            <p class="text-xs text-slate-400 px-4 leading-relaxed">Cảm ơn bạn đã đồng hành cùng HomesCoffee. Chúc bạn có những phút giây tuyệt vời!</p>
-                        </div>
-                    </div>
-                </template>
+<div class="box-body"></div>
+<div class="box-front"></div>
+<div class="ribbon-v"></div>
+<div class="box-seal"><i class="fa-solid fa-star"></i></div>
+<div class="lid"></div>
+<div class="bow"><i></i></div>
 
-                <!-- TRƯỜNG HỢP 3: CHÚC MAY MẮN LẦN SAU -->
-                <template x-if="!wonPrize || wonPrize.type === 'none' || wonPrize.name.toLowerCase().includes('chúc may mắn')">
-                    <div class="space-y-3 py-1">
-                        <div class="w-16 h-16 bg-slate-800 text-amber-400 border border-slate-700 rounded-2xl flex items-center justify-center mx-auto text-2xl shadow-inner">
-                            <i class="fa-solid fa-face-smile-wink"></i>
-                        </div>
-                        <div class="space-y-1">
-                            <span class="inline-block text-[10px] bg-slate-800 text-slate-400 border border-slate-700 font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">Hẹn Gặp Lại Bạn</span>
-                            <h2 class="font-black text-xl text-white pt-1">Chúc may mắn lần sau!</h2>
-                            <p class="text-xs text-slate-400 px-4 leading-relaxed">Hôm nay chưa phải ngày may mắn của bạn. Đừng quên ghé HomesCoffee nhận quà ở hóa đơn tiếp theo nhé!</p>
-                        </div>
-                    </div>
-                </template>
+</div>
+</div>
 
-            </div>
-        </template>
+<div class="stage-text">
+<div class="stage-kicker" x-text="stageTitle"></div>
+<div class="stage-instruction" x-text="stageInstruction"></div>
+</div>
 
-        <!-- Footer -->
-        <div class="pt-3 border-t border-slate-800 text-[10px] text-slate-500 relative z-10">
-            Hotline hỗ trợ: <strong class="text-slate-400">0972.023.222</strong>
-        </div>
-    </div>
+<div class="mt-3">
+<button class="open-btn"
+        @click="openGift()"
+        :disabled="isExecuting || prizesList.length === 0 || openingComplete">
+<div class="btn-content">
+<span class="btn-icon">
+<i class="fa-solid" :class="isExecuting ? 'fa-spinner fa-spin' : 'fa-hammer'"></i>
+</span>
+<span x-text="buttonText"></span>
+</div>
+</button>
 
-    <script>
-        const firebaseConfig = {
-            apiKey: "AIzaSyCjolGY6uh5pY7CHIc0ON6m8qNSz5xJDXM",
-            authDomain: "dbcoffee-bbeaf.firebaseapp.com",
-            databaseURL: "https://dbcoffee-bbeaf-default-rtdb.asia-southeast1.firebasedatabase.app",
-            projectId: "dbcoffee-bbeaf",
-            storageBucket: "dbcoffee-bbeaf.firebasestorage.app",
-            messagingSenderId: "118275632803",
-            appId: "1:118275632803:web:459762b6ace8d1c25ed916",
-            measurementId: "G-MHVZ55R50Y"
-        };
+<div class="mt-2 flex justify-center items-center gap-1.5 text-[8px] font-bold text-slate-400">
+<i class="fa-solid fa-shield-halved text-emerald-400"></i>
+<span>HÓA ĐƠN ĐÃ XÁC THỰC AN TOÀN</span>
+</div>
+</div>
 
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
+</section>
+</template>
 
-        function giftApp() {
-            return {
-                prizesList: [],
-                isInvalidLink: true,
-                errorMessage: 'Đang kiểm tra tính hợp lệ của mã QR...',
-                hasOpened: false,
-                wonPrize: null,
-                voucherCode: '',
-                currentToken: null,
+<!-- RESULT -->
+<template x-if="hasOpened">
+<section class="result relative z-10">
 
-                init() {
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const token = urlParams.get('token');
+<template x-if="wonPrize && wonPrize.type !== 'none' && Number(wonPrize.value || 0) > 0 && !wonPrize.name.toLowerCase().includes('chúc may mắn')">
+<div>
+<div class="result-icon">
+<template x-if="wonPrize.image">
+<img :src="wonPrize.image" alt="">
+</template>
+<template x-if="!wonPrize.image">
+<div class="trophy"><i class="fa-solid fa-trophy"></i></div>
+</template>
+</div>
 
-                    if (!token) {
-                        this.isInvalidLink = true;
-                        this.errorMessage = 'Bạn không thể truy cập trực tiếp trang này nếu không có mã QR từ hóa đơn thanh toán.';
-                        return;
-                    }
+<span class="badge bg-emerald-500/[.09] text-emerald-300 border border-emerald-500/20">
+<i class="fa-solid fa-circle-check"></i> Chúc mừng bạn
+</span>
 
-                    this.currentToken = token;
+<h2 class="result-title" x-text="wonPrize.name"></h2>
+<p class="result-desc px-3" x-text="getPrizeDescription(wonPrize)"></p>
 
-                    db.ref('giftSessions/' + token).once('value', snap => {
-                        const sessionData = snap.val();
-                        if (!sessionData) {
-                            this.isInvalidLink = true;
-                            this.errorMessage = 'Mã QR không tồn tại hoặc đã hết hạn.';
-                            return;
-                        }
+<div class="voucher">
+<div class="vh">
+<span class="vl">Mã xác nhận tại quầy</span>
+<span class="valid"><i class="fa-solid fa-check mr-1"></i> HỢP LỆ</span>
+</div>
+<div class="code" x-text="voucherCode"></div>
+<p class="note"><i class="fa-solid fa-camera mr-1"></i> Vui lòng chụp màn hình mã này và đưa cho thu ngân.</p>
+</div>
+</div>
+</template>
 
-                        if (sessionData.used) {
-                            this.isInvalidLink = true;
-                            this.errorMessage = 'Mã QR này đã được sử dụng để mở quà trước đó. Mỗi hóa đơn chỉ được mở 1 lần duy nhất!';
-                            return;
-                        }
+<template x-if="wonPrize && wonPrize.type === 'gift' && (!wonPrize.value || Number(wonPrize.value) === 0)">
+<div class="py-2">
+<template x-if="wonPrize.image">
+<img :src="wonPrize.image" class="w-[86px] h-[86px] object-cover rounded-[24px] mx-auto border-2 border-cyan-400/70 shadow-[0_0_30px_rgba(6,182,212,.18)]">
+</template>
+<template x-if="!wonPrize.image">
+<div class="trophy" style="background:linear-gradient(145deg,#22d3ee,#0891b2);box-shadow:0 0 30px rgba(6,182,212,.25)"><i class="fa-solid fa-gift"></i></div>
+</template>
+<span class="badge mt-4 bg-cyan-500/[.08] text-cyan-300 border border-cyan-500/20">
+<i class="fa-solid fa-heart"></i> Món quà tri ân
+</span>
+<h2 class="result-title" x-text="wonPrize.name"></h2>
+<p class="result-desc px-5">Cảm ơn bạn đã đồng hành cùng Nexa Coffee. Chúc bạn có những phút giây thật tuyệt vời!</p>
+</div>
+</template>
 
-                        this.isInvalidLink = false;
-                        db.ref('miniGamePrizes').once('value', prizeSnap => {
-                            const d = prizeSnap.val();
-                            if (d) {
-                                this.prizesList = Object.keys(d).map(k => ({ id: k, ...d[k] })).filter(p => p.isActive);
-                            }
-                        });
-                    });
-                },
+<template x-if="!wonPrize || wonPrize.type === 'none' || wonPrize.name.toLowerCase().includes('chúc may mắn')">
+<div class="py-2">
+<div class="luck-icon"><i class="fa-solid fa-face-smile-wink"></i></div>
+<span class="badge bg-slate-800/60 text-slate-400 border border-slate-700">
+<i class="fa-regular fa-face-smile"></i> Hẹn gặp lại bạn
+</span>
+<h2 class="result-title">Chúc may mắn lần sau!</h2>
+<p class="result-desc px-5">Hôm nay chưa phải ngày may mắn của bạn. Đừng quên ghé Nexa Coffee ở hóa đơn tiếp theo nhé!</p>
+</div>
+</template>
 
-                openGift() {
-                    if (this.prizesList.length === 0) {
-                        alert('Chương trình mở quà hiện chưa sẵn sàng.');
-                        return;
-                    }
+</section>
+</template>
 
-                    db.ref('giftSessions/' + this.currentToken).update({ used: true });
+<footer class="footer relative z-10">
+Hotline hỗ trợ: <strong>0972.023.222</strong>
+</footer>
+</main>
 
-                    const totalChance = this.prizesList.reduce((sum, p) => sum + Number(p.chance || 0), 0);
-                    let randomNum = Math.random() * totalChance;
-                    let accumulated = 0;
-                    let selected = this.prizesList[0];
+<script>
+const firebaseConfig = {
+ apiKey:"AIzaSyCjolGY6uh5pY7CHIc0ON6m8qNSz5xJDXM",
+ authDomain:"dbcoffee-bbeaf.firebaseapp.com",
+ databaseURL:"https://dbcoffee-bbeaf-default-rtdb.asia-southeast1.firebasedatabase.app",
+ projectId:"dbcoffee-bbeaf",
+ storageBucket:"dbcoffee-bbeaf.firebasestorage.app",
+ messagingSenderId:"118275632803",
+ appId:"1:118275632803:web:459762b6ace8d1c25ed916",
+ measurementId:"G-MHVZ55R50Y"
+};
 
-                    for (let p of this.prizesList) {
-                        accumulated += Number(p.chance || 0);
-                        if (randomNum <= accumulated) {
-                            selected = p;
-                            break;
-                        }
-                    }
+firebase.initializeApp(firebaseConfig);
+const db=firebase.database();
 
-                    this.wonPrize = selected;
-                    this.voucherCode = 'HC' + Math.floor(100000 + Math.random() * 900000);
-                    this.hasOpened = true;
+function giftGameApp(){
+ return {
+  prizesList:[],
+  isInvalidLink:true,
+  errorMessage:"Đang kiểm tra tính hợp lệ của mã QR...",
+  hasOpened:false,
+  wonPrize:null,
+  voucherCode:"",
+  currentToken:null,
+  isExecuting:false,
+  openingComplete:false,
+  hitCount:0,
+  stageTitle:"HỘP QUÀ ĐANG CHỜ BẠN",
+  stageInstruction:"Đập hộp để khám phá món quà bí mật dành riêng cho bạn.",
+  buttonText:"ĐẬP HỘP KHUI QUÀ",
 
-                    db.ref('wonGifts').push({
-                        prizeName: selected.name,
-                        code: this.voucherCode,
-                        token: this.currentToken,
-                        timestamp: new Date().toISOString()
-                    });
-                },
+  init(){
+   const token=new URLSearchParams(window.location.search).get("token");
+   if(!token){
+    this.errorMessage="Bạn không thể truy cập trực tiếp trang này nếu không có mã QR từ hóa đơn thanh toán.";
+    return;
+   }
+   this.currentToken=token;
 
-                getPrizeDescription(prize) {
-                    if (prize.type === 'discount') return `Bạn nhận được ưu đãi giảm ${prize.value}% cho hóa đơn tiếp theo.`;
-                    if (prize.type === 'gift') return `Bạn được tặng ngay một phần quà/topping miễn phí.`;
-                    if (prize.type === 'voucher') return `Bạn nhận được mã voucher giảm trực tiếp ${Number(prize.value).toLocaleString()}đ.`;
-                    return `Rất tiếc, chúc bạn may mắn trong lần ghé thăm tới!`;
-                }
-            }
-        }
-    </script>
+   db.ref("giftSessions/"+token).once("value").then(snap=>{
+    const session=snap.val();
+    if(!session){
+     this.errorMessage="Mã QR không tồn tại hoặc đã hết hạn.";
+     return;
+    }
+    if(session.used){
+     this.errorMessage="Mã QR này đã được sử dụng để mở quà trước đó. Mỗi hóa đơn chỉ được mở 1 lần duy nhất!";
+     return;
+    }
+    this.isInvalidLink=false;
+    return db.ref("miniGamePrizes").once("value");
+   }).then(snap=>{
+    if(!snap)return;
+    const d=snap.val();
+    this.prizesList=d?Object.keys(d).map(k=>({id:k,...d[k]})).filter(p=>p.isActive):[];
+    if(!this.prizesList.length){
+     this.errorMessage="Hiện chưa có phần quà nào đang hoạt động.";
+     this.isInvalidLink=true;
+    }
+   }).catch(err=>{
+    console.error(err);
+    this.errorMessage="Không thể kết nối hệ thống. Vui lòng thử lại sau.";
+    this.isInvalidLink=true;
+   });
+  },
+
+  openGift(){
+   if(this.isExecuting || this.hasOpened || !this.prizesList.length)return;
+   this.isExecuting=true;
+   this.hitCount=1;
+   this.stageTitle="BÙM! HỘP ĐANG RUNG...";
+   this.stageInstruction="Giữ nguyên... hộp quà đang mở dần!";
+   this.buttonText="ĐANG KHUI QUÀ...";
+   if(navigator.vibrate) navigator.vibrate([60,70,90,60,130,50,180]);
+   setTimeout(()=>{this.stageTitle="⚡ RUNG MẠNH!";this.stageInstruction="Bên trong đang có điều bất ngờ...";if(navigator.vibrate) navigator.vibrate([100,50,140,45,180]);},850);
+   setTimeout(()=>{this.stageTitle="✦ ĐANG XÉ NIÊM PHONG ✦";this.stageInstruction="Nắp hộp sắp bật ra rồi!";},1750);
+   setTimeout(()=>{this.startReveal();},2250);
+  },
+
+  startReveal(){
+   this.isExecuting=true;
+   this.openingComplete=true;
+   this.stageTitle="✨ KHUI QUÀ ✨";
+   this.stageInstruction="Món quà bí mật của bạn đang xuất hiện!";
+   this.buttonText="ĐANG MỞ QUÀ...";
+
+   const totalChance=this.prizesList.reduce((sum,p)=>sum+Number(p.chance||0),0);
+   let randomNum=Math.random()*totalChance, accumulated=0,targetIndex=0;
+   for(let i=0;i<this.prizesList.length;i++){accumulated+=Number(this.prizesList[i].chance||0);if(randomNum<=accumulated){targetIndex=i;break}}
+   const selected=this.prizesList[targetIndex];
+   this.fireConfetti();
+   if(navigator.vibrate) navigator.vibrate([180,60,220]);
+   setTimeout(()=>{
+    this.wonPrize=selected;
+    this.voucherCode="HC"+Math.floor(100000+Math.random()*900000);
+    this.hasOpened=true;
+    this.isExecuting=false;
+    db.ref("wonGifts").push({prizeName:selected.name,prizeType:selected.type||"",prizeValue:selected.value||0,code:this.voucherCode,token:this.currentToken,timestamp:new Date().toISOString()});
+   },1150);
+   db.ref("giftSessions/"+this.currentToken).update({used:true});
+  },
+
+  fireConfetti(){
+   const symbols=["✦","✧","•","◆","★"];
+   for(let i=0;i<36;i++){
+    const el=document.createElement("span");el.className="confetti fire";el.textContent=symbols[Math.floor(Math.random()*symbols.length)];
+    el.style.left=(50+(Math.random()-.5)*8)+"%";el.style.top=(48+(Math.random()-.5)*6)+"%";
+    el.style.setProperty("--x",((Math.random()-.5)*360)+"px");el.style.setProperty("--y",((Math.random()-.65)*350)+"px");el.style.setProperty("--r",(Math.random()*900-450)+"deg");el.style.fontSize=(8+Math.random()*10)+"px";
+    document.body.appendChild(el);setTimeout(()=>el.remove(),1400);
+   }
+  },
+
+  getPrizeDescription(prize){
+   if(prize.type==="discount")return `Bạn nhận được ưu đãi giảm ${prize.value}% cho hóa đơn tiếp theo.`;
+   if(prize.type==="gift")return "Bạn được tặng ngay một phần quà/topping miễn phí.";
+   if(prize.type==="voucher")return `Bạn nhận được mã voucher giảm trực tiếp ${Number(prize.value).toLocaleString()}đ.`;
+   return "Rất tiếc, chúc bạn may mắn trong lần ghé thăm tới!";
+  }
+ };
+}
+</script>
 </body>
 </html>
