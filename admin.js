@@ -55,7 +55,16 @@ function cafeApp() {
             });
             return Object.values(itemMap).sort((a, b) => b.revenue - a.revenue);
         },
-
+        // Tự động lấy danh sách sản phẩm từ Thực đơn (Menu) những món không có định lượng NVL để đưa vào Kho Sản Phẩm
+        get inventorySP() {
+            return (this.menuItems || []).map(m => ({
+                id: m.id,
+                name: m.name,
+                unit: m.unit || 'ly',
+                stock: m.stock !== undefined ? Number(m.stock) : 0,
+                image: m.image || ''
+            }));
+        },
         // 2. Báo cáo doanh thu theo nhân viên
         get reportByStaff() {
             const staffMap = {};
@@ -133,6 +142,9 @@ function cafeApp() {
         showQrModal: false,
         selectedTableForQr: null,
         showAllQrModal: false,
+        // Tìm kiếm nhanh thực đơn
+        importSearchQuery: '',
+        showImportDropdown: false,
 
         // Quản lý in kết ca
         selectedShiftToPrint: null,
@@ -233,7 +245,7 @@ function cafeApp() {
         showUnitModal: false,
         newUnitName: '',
         importTab: 'nvl',
-        importOrder: { supplier: '', note: '', items: [] },
+        importOrder: { supplier: '', paymentMethod: 'Tiền mặt', note: '', items: [] },
         selectedImportItemId: '',
         showInventoryModal: false,
         invForm: { id: null, name: '', stock: 100, unit: 'g', type: 'nvl' },
@@ -243,6 +255,19 @@ function cafeApp() {
         supplierForm: { id: null, name: '', phone: '', address: '', note: '' },
         inventoryHistory: [],
 
+        // ================= SỬA XUÂT-NHẬP-TỒN =================
+        showEditStockModal: false,
+        editStockForm: { id: '', name: '', stock: 0, isNVL: true },
+        // ================= SỬA XUÂT-NHẬP-TỒN =================
+        showPayDebtModal: false,
+        payDebtForm: {
+            supplierId: '',
+            supplierName: '',
+            maxDebt: 0,
+            amount: 0,
+            paymentMethod: 'Tiền mặt',
+            note: ''
+        },
         // ================= LỊCH SỬ HÓA ĐƠN =================
         historyFilterKeyword: '',
         historyFilterDate: '',
@@ -259,6 +284,12 @@ function cafeApp() {
         prizeForm: { id: null, name: '', type: 'discount', value: 10, chance: 20, isActive: true },
         giftVoucherCode: '',
         appliedVoucherInfo: null,
+
+        // Bổ sung biến lưu từ khóa tìm kiếm XNT vào phần khai báo dữ liệu:
+        xntSearchKeyword: '',
+        importViewMode: 'list', // 'list' (Danh sách) hoặc 'form' (Tạo/Sửa phiếu)
+        editingImportId: null,
+
 
         // ================= SỔ QUỸ THU CHI =================
         cashFlowList: [],
@@ -279,12 +310,26 @@ function cafeApp() {
         ],
 
         // ================= KHỞI TẠO DỮ LIỆU REALTIME =================
+        // Khai báo mảng lưu trữ Kho sản phẩm đồng bộ từ menu
+        inventorySP: [],
+
+        // Trong hàm init(), thêm đoạn lắng nghe dữ liệu thực đơn để tự động đồng bộ sang kho sản phẩm
         init() {
             db.ref('menu').on('value', snap => {
                 const d = snap.val();
                 this.menuItems = d ? Object.keys(d).map(k => ({ id: k, ...d[k] })) : [];
+                
+                // Tự động đồng bộ thực đơn vào Kho Sản Phẩm để nhập kho
+                this.inventorySP = this.menuItems.map(m => ({
+                    id: m.id,
+                    name: m.name,
+                    unit: m.unit || 'ly',
+                    stock: m.stock !== undefined ? Number(m.stock) : 0,
+                    image: m.image || ''
+                }));
             });
 
+            // Các lệnh lắng nghe khác giữ nguyên...
             db.ref('tables').on('value', snap => {
                 const d = snap.val();
                 this.tables = d ? Object.keys(d).map(k => ({ id: k, ...d[k] })) : [];
@@ -294,20 +339,24 @@ function cafeApp() {
                 const d = snap.val();
                 if (d) this.areas = d;
             });
+            
             db.ref('systemLogs').on('value', snap => {
-    const d = snap.val();
-    this.systemLogsList = d ? Object.keys(d).map(k => ({ id: k, ...d[k] })).reverse() : [];
-});
+                const d = snap.val();
+                this.systemLogsList = d ? Object.keys(d).map(k => ({ id: k, ...d[k] })).reverse() : [];
+            });
+
             db.ref('categories').on('value', snap => {
                 const d = snap.val();
                 if (d && Array.isArray(d)) {
                     this.categories = ['Tất cả', ...d.filter(c => c !== 'Tất cả')];
                 }
             });
+
             db.ref('miniGamePrizes').on('value', snap => {
                 const d = snap.val();
                 this.miniGamePrizes = d ? Object.keys(d).map(k => ({ id: k, ...d[k] })) : [];
             });
+
             db.ref('settings/store').on('value', snap => {
                 const d = snap.val();
                 if (d) this.storeSettings = { ...this.storeSettings, ...d };
@@ -316,21 +365,6 @@ function cafeApp() {
             db.ref('promotions').on('value', snap => {
                 const d = snap.val();
                 this.promotionsList = d ? Object.keys(d).map(k => ({ id: k, ...d[k] })) : [];
-            });
-
-            db.ref('pendingOrders').on('value', snap => {
-                const d = snap.val();
-                if (d) {
-                    this.pendingCustomerOrders = Object.keys(d).map(k => ({ key: k, ...d[k] })).filter(o => o.status === 'pending');
-                    if (this.pendingCustomerOrders.length > 0) {
-                        try {
-                            let audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-                            audio.play();
-                        } catch(e){}
-                    }
-                } else {
-                    this.pendingCustomerOrders = [];
-                }
             });
 
             db.ref('suppliers').on('value', snap => {
@@ -345,12 +379,12 @@ function cafeApp() {
 
             db.ref('cashFlow').on('value', snap => {
                 const d = snap.val();
-                this.cashFlowList = d ? Object.keys(d).map(k => ({ id: k, ...d[k] })).reverse() : [];
+                this.cashFlowList = d ? Object.keys(d).map(k => ({ id: k, ...d[k] })) : [];
             });
 
             db.ref('shiftsHistory').on('value', snap => {
                 const d = snap.val();
-                this.shiftsHistory = d ? Object.keys(d).map(k => ({ id: k, ...d[k] })).reverse() : [];
+                this.shiftsHistory = d ? Object.keys(d).map(k => ({ id: k, ...d[k] })) : [];
             });
 
             db.ref('units').on('value', snap => {
@@ -369,10 +403,6 @@ function cafeApp() {
                 this.inventoryNVL = snap.val() ? Object.keys(snap.val()).map(k => ({ id: k, ...snap.val()[k] })) : []; 
             });
 
-            db.ref('inventorySP').on('value', snap => { 
-                this.inventorySP = snap.val() ? Object.keys(snap.val()).map(k => ({ id: k, ...snap.val()[k] })) : []; 
-            });
-
             db.ref('staff').on('value', snap => { 
                 const d = snap.val();
                 this.staffList = d ? Object.keys(d).map(k => ({ id: k, ...d[k] })) : []; 
@@ -383,7 +413,6 @@ function cafeApp() {
                 this.ordersList = d ? Object.keys(d).map(k => ({ id: k, ...d[k] })) : []; 
             });
         },
-
         // ================= PHÂN QUYỀN & CHUYỂN TAB =================
         hasPermission(allowedRoles = []) {
             if (!this.currentUser) return false;
@@ -457,6 +486,7 @@ function cafeApp() {
             this.loginForm = { username: '', pin: '' };
         },
 
+        
         // ================= QUẢN LÝ CA LÀM VIỆC =================
         openShift() {
             if (!this.currentUser) { alert('Vui lòng đăng nhập trước!'); return; }
@@ -500,8 +530,15 @@ function cafeApp() {
                 systemExpectedCash: expectedCash
             };
         },
-        
-
+            get filteredImportItems() {
+            const list = this.importTab === 'sp' ? this.inventorySP : this.inventoryNVL;
+            if (!this.importSearchQuery || this.importSearchQuery.trim() === '') return list;
+            const kw = this.importSearchQuery.toLowerCase().trim();
+            return list.filter(i => (i.name || '').toLowerCase().includes(kw));
+        },
+        get importTotalAmount() {
+            return (this.importOrder.items || []).reduce((sum, item) => sum + (Number(item.qty || 0) * Number(item.price || 0)), 0);
+        },
         openCloseShiftModalFunc() {
             if (!this.currentShift) { alert('Hiện tại chưa có ca làm việc nào đang mở!'); return; }
             this.closeShiftForm.actualCash = this.shiftStats.systemExpectedCash;
@@ -749,6 +786,47 @@ savePromotion() {
     this.sendTelegramMessage(teleAlert);
 },
 
+openCreateImportForm() {
+            this.editingImportId = null;
+            this.importOrder = { supplier: '', note: '', paymentMethod: 'Tiền mặt', items: [] };
+            this.importViewMode = 'form';
+        },
+
+        openEditImportForm(h) {
+            this.editingImportId = h.id;
+            this.importOrder = {
+                supplier: h.supplier || '',
+                note: h.note || '',
+                paymentMethod: h.paymentMethod || 'Tiền mặt',
+                items: JSON.parse(JSON.stringify(h.items || []))
+            };
+            this.importViewMode = 'form';
+        },
+
+        deleteImportReceipt(h) {
+            if (!confirm(`Bạn có chắc muốn xóa phiếu nhập từ NCC "${h.supplier}"?`)) return;
+            
+            // Trừ lại số lượng tồn kho tương ứng đã cộng trước đó
+            (h.items || []).forEach(imp => {
+                if (h.targetWarehouse && h.targetWarehouse.includes('Sản Phẩm')) {
+                    const targetMenu = this.menuItems.find(m => m.id === imp.id);
+                    if (targetMenu) {
+                        const cur = Number(targetMenu.stock || 0);
+                        db.ref('menu/' + imp.id).update({ stock: Math.max(0, cur - Number(imp.qty)) });
+                    }
+                } else {
+                    let target = this.inventoryNVL.find(i => i.id === imp.id);
+                    if (target) {
+                        const cur = Number(target.stock || 0);
+                        db.ref('inventoryNVL/' + target.id).update({ stock: Math.max(0, cur - Number(imp.qty)) });
+                    }
+                }
+            });
+
+            db.ref('inventoryHistory/' + h.id).remove();
+            alert('Đã xóa phiếu nhập kho thành công!');
+        },
+
 // Hàm xóa toàn bộ hoặc từng log (Dành cho Quản lý)
 clearAllLogs() {
     if (!this.hasPermission(['Quản lý'])) {
@@ -936,6 +1014,7 @@ finalTotal() {
             // 1. Trừ kho tự động
             let exportedItems = [];
             this.currentOrder.items.forEach(cartItem => {
+                // Trừ kho Nguyên Vật Liệu (NVL) nếu món có định lượng công thức
                 if (cartItem.recipeList && Array.isArray(cartItem.recipeList)) {
                     cartItem.recipeList.forEach(recipeItem => {
                         let inv = this.inventoryNVL.find(i => i.id === recipeItem.invId);
@@ -947,14 +1026,21 @@ finalTotal() {
                         }
                     });
                 }
+                
+                // Trừ kho Sản Phẩm / Hàng bán sẵn (Lấy trực tiếp từ menu)
                 let matchedSP = this.inventorySP.find(sp => sp.name.toLowerCase() === cartItem.name.toLowerCase());
                 if (matchedSP) {
-                    let newStockSP = Math.max(0, matchedSP.stock - cartItem.qty);
-                    db.ref('inventorySP/' + matchedSP.id).update({ stock: newStockSP });
+                    let currentStock = matchedSP.stock !== undefined ? Number(matchedSP.stock) : 0;
+                    let newStockSP = Math.max(0, currentStock - cartItem.qty);
+                    
+                    // Cập nhật tồn kho trực tiếp vào nhánh menu trên Firebase
+                    db.ref('menu/' + matchedSP.id).update({ stock: newStockSP });
+                    
                     exportedItems.push({ id: matchedSP.id, name: matchedSP.name, qty: cartItem.qty, unit: matchedSP.unit });
                 }
             });
 
+            // Ghi nhận lịch sử xuất kho (XUAT) để báo cáo Xuất-Nhập-Tồn tính chính xác tổng xuất
             if (exportedItems.length > 0) {
                 db.ref('inventoryHistory').push({
                     type: 'XUAT',
@@ -1555,28 +1641,64 @@ printTemporaryBill() {
         },
         removeFromImportList(index) { this.importOrder.items.splice(index, 1); },
         confirmImportGoods() {
-            if (this.importOrder.items.length === 0) return;
-            let targetRef = this.importTab === 'sp' ? 'inventorySP' : 'inventoryNVL';
-            let list = this.importTab === 'sp' ? this.inventorySP : this.inventoryNVL;
-
+            if (!this.importOrder.supplier) { alert('Vui lòng chọn Nhà cung cấp!'); return; }
+            if (!this.importOrder.items.length) { alert('Chưa có mặt hàng nào trong phiếu nhập!'); return; }
+            
             this.importOrder.items.forEach(imp => {
-                let target = list.find(i => i.id === imp.id);
-                if (target) db.ref(targetRef + '/' + target.id).update({ stock: Number(target.stock) + Number(imp.qty) });
+                if (this.importTab === 'sp') {
+                    const targetMenu = this.menuItems.find(m => m.id === imp.id);
+                    const currentStock = targetMenu && targetMenu.stock ? Number(targetMenu.stock) : 0;
+                    db.ref('menu/' + imp.id).update({ stock: currentStock + Number(imp.qty) });
+                } else {
+                    let target = this.inventoryNVL.find(i => i.id === imp.id);
+                    if (target) {
+                        db.ref('inventoryNVL/' + target.id).update({ stock: Number(target.stock) + Number(imp.qty) });
+                    }
+                }
             });
 
-            db.ref('inventoryHistory').push({
+            const totalMoney = this.importTotalAmount;
+            const payload = {
                 type: 'NHAP',
-                targetWarehouse: this.importTab === 'sp' ? 'Kho Sản Phẩm' : 'Kho NVL',
-                supplier: this.importOrder.supplier || 'NCC Vãng lai',
+                targetWarehouse: this.importTab === 'sp' ? 'Kho Sản Phẩm (Thực đơn)' : 'Kho Nguyên Vật Liệu',
+                supplier: this.importOrder.supplier,
                 note: this.importOrder.note || '',
-                items: this.importOrder.items,
+                paymentMethod: this.importOrder.paymentMethod || 'Tiền mặt', // Đảm bảo lưu đúng hình thức (Tiền mặt, Chuyển khoản, Công nợ)
+                totalAmount: totalMoney,
+                items: [...this.importOrder.items],
+                timestamp: new Date().toISOString()
+            };
+
+            if (this.editingImportId) {
+                db.ref('inventoryHistory/' + this.editingImportId).update(payload);
+                alert('Cập nhật phiếu nhập kho thành công!');
+            } else {
+                db.ref('inventoryHistory').push(payload);
+                alert(`Lập phiếu nhập kho thành công! Tổng tiền: ${totalMoney.toLocaleString()}đ`);
+            }
+
+            // Nếu thanh toán bằng Tiền mặt ngay thì mới tự động lập phiếu Chi vào sổ quỹ
+            if (this.importOrder.paymentMethod === 'Tiền mặt' && totalMoney > 0 && !this.editingImportId) {
+                db.ref('cashFlow').push({
+                type: 'CHI',
+                category: 'Mua nguyên vật liệu ngoài',
+                amount: amount,
+                recipient: this.payDebtForm.supplierName,
+                note: this.payDebtForm.note.trim() || `Thanh toán trả công nợ nhà cung cấp ${this.payDebtForm.supplierName}`,
+                paymentMethod: this.payDebtForm.paymentMethod || 'Tiền mặt',
+                created_by: this.currentUser ? this.currentUser.name : 'Quản lý',
                 timestamp: new Date().toISOString()
             });
 
-            alert('Nhập kho thành công!');
-            this.importOrder = { supplier: '', note: '', items: [] };
-        },
+            alert(`Đã thanh toán thành công ${amount.toLocaleString()}đ cho nhà cung cấp ${this.payDebtForm.supplierName}! Phiếu chi đã được ghi vào sổ quỹ.`);
+            this.showPayDebtModal = false;
+        
+            }
 
+            this.importViewMode = 'list';
+            this.importOrder = { supplier: '', note: '', paymentMethod: 'Tiền mặt', items: [] };
+            this.editingImportId = null;
+        },
         openSupplierModal() { this.isEditingSupplier = false; this.supplierForm = { id: null, name: '', phone: '', address: '', note: '' }; this.showSupplierModal = true; },
         openEditSupplierModal(s) { this.isEditingSupplier = true; this.supplierForm = { ...s }; this.showSupplierModal = true; },
         saveSupplier() {
@@ -1588,29 +1710,47 @@ printTemporaryBill() {
         },
         deleteSupplier(id) { if (confirm('Xóa NCC này?')) db.ref('suppliers/' + id).remove(); },
 
+        // Báo cáo Xuất - Nhập - Tồn có tích hợp bộ lọc từ khóa nhanh
         get xntReport() {
             let allItems = [
-                ...this.inventoryNVL.map(i => ({ ...i, typeName: 'Nguyên vật liệu' })),
-                ...this.inventorySP.map(i => ({ ...i, typeName: 'Hàng bán sẵn' }))
+                ...this.inventoryNVL.map(i => ({ ...i, typeName: 'Nguyên vật liệu', isNVL: true })),
+                ...this.inventorySP.map(i => ({ ...i, typeName: 'Hàng bán sẵn', isNVL: false }))
             ];
+
+            if (this.xntSearchKeyword && this.xntSearchKeyword.trim() !== '') {
+                const kw = this.xntSearchKeyword.toLowerCase().trim();
+                allItems = allItems.filter(i => (i.name || '').toLowerCase().includes(kw));
+            }
+
             return allItems.map(item => {
                 let totalImport = 0, totalExport = 0;
                 this.inventoryHistory.forEach(h => {
                     (h.items || []).forEach(it => {
-                        if (it.id === item.id || (it.name && it.name.toLowerCase() === item.name.toLowerCase())) {
-                            if (h.type === 'NHAP') totalImport += Number(it.qty || 0);
-                            if (h.type === 'XUAT') totalExport += Number(it.qty || 0);
+                        if (it.id === item.id || (it.name && it.name.trim().toLowerCase() === item.name.trim().toLowerCase())) {
+                            const qty = Number(it.qty || 0);
+                            if (h.type === 'NHAP') totalImport += qty;
+                            else if (h.type === 'XUAT') totalExport += qty;
                         }
                     });
                 });
+
+                const currentStock = Number(item.stock || 0);
+                let initialStock = currentStock - totalImport + totalExport;
+                initialStock = Math.max(0, initialStock);
+
                 return {
-                    id: item.id, name: item.name, unit: item.unit, typeName: item.typeName,
-                    initialStock: Math.max(0, Number(item.stock) + totalExport - totalImport),
-                    importStock: totalImport, exportStock: totalExport, currentStock: Number(item.stock)
+                    id: item.id, 
+                    name: item.name, 
+                    unit: item.unit || 'g', 
+                    typeName: item.typeName,
+                    isNVL: item.isNVL, // <--- Quan trọng để biết cập nhật vào bảng nào
+                    initialStock: initialStock,
+                    importStock: totalImport, 
+                    exportStock: totalExport, 
+                    currentStock: currentStock
                 };
             });
         },
-
         // ================= SỔ QUỸ THU CHI =================
         get filteredCashFlowList() {
             const posIncomeRows = (this.ordersList || []).map(order => ({
@@ -1680,6 +1820,88 @@ printTemporaryBill() {
             return (this.totalAutoPosIncome + this.totalManualIncome) - this.totalExpenses;
         },
 
+        // Getter tự động tổng hợp tổng tiền nhập và công nợ của từng Nhà Cung Cấp
+        get suppliersWithDebt() {
+            const list = this.suppliersList || [];
+            
+            // Chuẩn hóa inventoryHistory từ object Firebase sang mảng an toàn
+            const rawHistory = this.inventoryHistory;
+            const history = Array.isArray(rawHistory) 
+                ? rawHistory 
+                : (rawHistory ? Object.keys(rawHistory).map(k => ({ id: k, ...rawHistory[k] })) : []);
+
+            // Chuẩn hóa cashFlowList từ object Firebase sang mảng an toàn
+            const rawCashFlow = this.cashFlowList;
+            const cashFlows = Array.isArray(rawCashFlow) 
+                ? rawCashFlow 
+                : (rawCashFlow ? Object.keys(rawCashFlow).map(k => ({ id: k, ...rawCashFlow[k] })) : []);
+
+            return list.map(sup => {
+                let totalImport = 0;
+                let totalDebt = 0;
+                const supName = (sup.name || '').trim().toLowerCase();
+
+                history.forEach(h => {
+                    const hSupplier = (h.supplier || '').trim().toLowerCase();
+                    if (h.type === 'NHAP' && hSupplier === supName) {
+                        const amt = Number(h.totalAmount || 0);
+                        totalImport += amt;
+                        
+                        const method = (h.paymentMethod || '').trim().toLowerCase();
+                        // Nếu là công nợ hoặc chuyển khoản (hoặc bất kỳ hình thức nào không phải tiền mặt ngay)
+                        if (method.includes('công nợ') || method === 'công nợ' || method !== 'tiền mặt' && method !== 'tien mat') {
+                            totalDebt += amt;
+                        }
+                    }
+                });
+
+                // Trừ đi các khoản đã thanh toán trả nợ qua phiếu chi
+                cashFlows.forEach(cf => {
+                    const cfRecipient = (cf.recipient || '').trim().toLowerCase();
+                    if (cf.type === 'CHI' && cfRecipient === supName) {
+                        totalDebt -= Number(cf.amount || 0);
+                    }
+                });
+
+                return {
+                    ...sup,
+                    totalImport: totalImport,
+                    currentDebt: Math.max(0, totalDebt)
+                };
+            });
+        },
+
+        // Hàm trả công nợ (Tự động lập phiếu chi trừ nợ)
+        paySupplierDebt(sup) {
+            const debt = sup.currentDebt || 0;
+            if (debt <= 0) {
+                alert(`Nhà cung cấp "${sup.name}" hiện không có công nợ cần thanh toán!`);
+                return;
+            }
+
+            const payAmount = prompt(`Nhập số tiền muốn thanh toán công nợ cho "${sup.name}":`, debt);
+            if (!payAmount || isNaN(payAmount) || Number(payAmount) <= 0) return;
+
+            const amount = Number(payAmount);
+            if (amount > debt) {
+                if (!confirm(`Số tiền trả (${amount.toLocaleString()}đ) lớn hơn số nợ hiện tại (${debt.toLocaleString()}đ). Bạn có muốn tiếp tục?`)) return;
+            }
+
+            // Tạo phiếu chi tự động hạch toán vào Sổ Quỹ Thu Chi
+            db.ref('cashFlow').push({
+                type: 'CHI',
+                category: 'Mua nguyên vật liệu ngoài',
+                amount: amount,
+                recipient: sup.name,
+                note: `Thanh toán trả công nợ nhà cung cấp ${sup.name}`,
+                paymentMethod: 'Tiền mặt',
+                created_by: this.currentUser ? this.currentUser.name : 'Quản lý',
+                timestamp: new Date().toISOString()
+            });
+
+            alert(`Thanh toán thành công ${amount.toLocaleString()}đ tiền nợ cho ${sup.name}!`);
+        },
+
         openCashFlowModal(type = 'CHI') {
             this.isEditingCashFlow = false;
             this.cashFlowForm = { id: null, type, category: type === 'CHI' ? this.expenseCategories[0] : this.incomeCategories[1], amount: 0, recipient: '', note: '', paymentMethod: 'Tiền mặt' };
@@ -1691,7 +1913,75 @@ printTemporaryBill() {
             this.cashFlowForm = { ...c }; 
             this.showCashFlowModal = true; 
         },
-        
+        openEditStockModal(row) {
+            this.editStockForm = {
+                id: row.id,
+                name: row.name,
+                stock: row.currentStock || 0,
+                isNVL: row.isNVL
+            };
+            this.showEditStockModal = true;
+        },
+
+        saveStockEdit() {
+            if (!this.editStockForm.id) return;
+            const newStock = Number(this.editStockForm.stock) || 0;
+            // Nếu là NVL cập nhật vào inventoryNVL, ngược lại cập nhật trực tiếp vào menu (Kho SP)
+            const refPath = this.editStockForm.isNVL ? 'inventoryNVL/' : 'menu/';
+            
+            db.ref(refPath + this.editStockForm.id).update({ stock: newStock });
+            
+            alert(`Đã cập nhật tồn kho cho "${this.editStockForm.name}" thành ${newStock}!`);
+            this.showEditStockModal = false;
+        },
+        // Hàm mở modal trả nợ
+        openPayDebtModal(sup) {
+            const debt = sup.currentDebt || 0;
+            if (debt <= 0) {
+                alert(`Nhà cung cấp "${sup.name}" hiện không có công nợ cần thanh toán!`);
+                return;
+            }
+
+            this.payDebtForm = {
+                supplierId: sup.id,
+                supplierName: sup.name,
+                maxDebt: debt,
+                amount: debt, // Mặc định điền toàn bộ số tiền còn nợ
+                paymentMethod: 'Tiền mặt',
+                note: `Thanh toán trả công nợ nhà cung cấp ${sup.name}`
+            };
+            this.showPayDebtModal = true;
+        },
+
+        // Hàm xác nhận thanh toán công nợ (Tự động lập phiếu chi)
+        confirmPaySupplierDebt() {
+            const amount = Number(this.payDebtForm.amount) || 0;
+            if (amount <= 0) {
+                alert('Vui lòng nhập số tiền thanh toán hợp lệ (> 0)!');
+                return;
+            }
+
+            if (amount > this.payDebtForm.maxDebt) {
+                if (!confirm(`Số tiền thanh toán (${amount.toLocaleString()}đ) lớn hơn số nợ hiện tại (${this.payDebtForm.maxDebt.toLocaleString()}đ). Bạn có chắc chắn muốn tiếp tục?`)) {
+                    return;
+                }
+            }
+
+            // Tạo phiếu chi tự động hạch toán vào Sổ Quỹ Thu Chi
+            db.ref('cashFlow').push({
+                type: 'CHI',
+                category: 'Mua nguyên vật liệu ngoài',
+                amount: amount,
+                recipient: this.payDebtForm.supplierName,
+                note: this.payDebtForm.note.trim() || `Thanh toán trả công nợ nhà cung cấp ${this.payDebtForm.supplierName}`,
+                paymentMethod: this.payDebtForm.paymentMethod || 'Tiền mặt',
+                created_by: this.currentUser ? this.currentUser.name : 'Quản lý',
+                timestamp: new Date().toISOString()
+            });
+
+            alert(`Đã thanh toán thành công ${amount.toLocaleString()}đ cho nhà cung cấp ${this.payDebtForm.supplierName}! Phiếu chi đã được ghi vào sổ quỹ.`);
+            this.showPayDebtModal = false;
+        },
         saveCashFlow() {
             if (!this.cashFlowForm.amount || Number(this.cashFlowForm.amount) <= 0) {
                 alert('Vui lòng nhập số tiền hợp lệ (> 0)!');
