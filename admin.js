@@ -1285,10 +1285,14 @@ finalTotal() {
             }
         },
 
-        openMenuModal() { this.isEditingMenu = false; this.menuForm = { id: null, name: '', image: '', category: 'Café', price: 25000, recipeList: [] }; this.showMenuModal = true; },
+        openMenuModal() { 
+            this.isEditingMenu = false; 
+            this.menuForm = { id: null, name: '', image: '', category: 'Café', price: 25000, unit: 'ly', recipeList: [] }; 
+            this.showMenuModal = true; 
+        },
         openEditMenuModal(m) { 
             this.isEditingMenu = true; 
-            this.menuForm = { id: m.id, name: m.name, image: m.image || '', category: m.category, price: m.price, recipeList: m.recipeList ? [...m.recipeList] : [] }; 
+            this.menuForm = { id: m.id, name: m.name, image: m.image || '', category: m.category, price: m.price, unit: m.unit || 'ly', recipeList: m.recipeList ? [...m.recipeList] : [] }; 
             this.showMenuModal = true; 
         },
         addRecipeRow() { this.menuForm.recipeList.push({ invId: '', amount: 1 }); },
@@ -1300,6 +1304,7 @@ finalTotal() {
                 image: (this.menuForm.image || '').trim(),
                 category: this.menuForm.category,
                 price: Number(this.menuForm.price) || 0,
+                unit: (this.menuForm.unit || 'ly').trim(), // Lưu đơn vị tính
                 recipeList: this.menuForm.recipeList || []
             };
             if (this.isEditingMenu) db.ref('menu/' + this.menuForm.id).update(payload);
@@ -1311,8 +1316,8 @@ finalTotal() {
         // ================= EXCEL THỰC ĐƠN =================
         downloadMenuTemplate() {
             const data = [
-                { "Tên món (*)": "Cà phê sữa đá", "Danh mục (*)": "Café", "Giá bán (*)": 25000, "Link hình ảnh": "" },
-                { "Tên món (*)": "Trà đào cam sả", "Danh mục (*)": "Trà", "Giá bán (*)": 30000, "Link hình ảnh": "" }
+                { "Tên món (*)": "Cà phê sữa đá", "Danh mục (*)": "Café", "Giá bán (*)": 25000, "Đơn vị tính": "ly", "Link hình ảnh": "" },
+                { "Tên món (*)": "Trà đào cam sả", "Danh mục (*)": "Trà", "Giá bán (*)": 30000, "Đơn vị tính": "ly", "Link hình ảnh": "" }
             ];
             const ws = XLSX.utils.json_to_sheet(data);
             const wb = XLSX.utils.book_new();
@@ -1321,7 +1326,7 @@ finalTotal() {
         },
         exportMenuToExcel() {
             if (this.menuItems.length === 0) return;
-            const data = this.menuItems.map(i => ({ "Tên món": i.name, "Danh mục": i.category, "Giá bán": i.price, "Link hình ảnh": i.image || '' }));
+            const data = this.menuItems.map(i => ({ "Tên món": i.name, "Danh mục": i.category, "Giá bán": i.price, "Đơn vị tính": i.unit || 'ly', "Link hình ảnh": i.image || '' }));
             const ws = XLSX.utils.json_to_sheet(data);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "ThucDon");
@@ -1340,8 +1345,9 @@ finalTotal() {
                         const name = r["Tên món (*)"] || r["Tên món"];
                         const price = Number(r["Giá bán (*)"] || r["Giá bán"] || 0);
                         const category = r["Danh mục (*)"] || r["Danh mục"] || "Café";
+                        const unit = r["Đơn vị tính"] || "ly";
                         const image = r["Link hình ảnh"] || "";
-                        if (name) db.ref('menu').push({ name: String(name).trim(), price, category: String(category).trim(), image: String(image).trim(), recipeList: [] });
+                        if (name) db.ref('menu').push({ name: String(name).trim(), price, category: String(category).trim(), unit: String(unit).trim(), image: String(image).trim(), recipeList: [] });
                     });
                     alert(`Nhập thành công ${rows.length} món!`);
                 } catch (err) { alert('Lỗi đọc file Excel!'); }
@@ -1349,7 +1355,6 @@ finalTotal() {
             };
             reader.readAsArrayBuffer(file);
         },
-
         // ================= QR CODE & DUYỆT ĐƠN KHÁCH TỰ ĐẶT =================
         getTableQrUrl(table) {
             const currentUrl = window.location.href.split('?')[0].split('#')[0];
@@ -1925,13 +1930,42 @@ printTemporaryBill() {
 
         saveStockEdit() {
             if (!this.editStockForm.id) return;
-            const newStock = Number(this.editStockForm.stock) || 0;
-            // Nếu là NVL cập nhật vào inventoryNVL, ngược lại cập nhật trực tiếp vào menu (Kho SP)
+            const newTargetStock = Number(this.editStockForm.stock) || 0;
+            
+            // 1. Tìm thông tin dòng báo cáo hiện tại để lấy tổng nhập, tổng xuất
+            const currentItem = this.xntReport.find(i => String(i.id) === String(this.editStockForm.id));
+            if (!currentItem) return;
+
+            // 2. Tính ngược lại số lượng cần nhập bổ sung (hoặc điều chỉnh) vào lịch sử kho
+            // Công thức mong muốn: Tồn Cuối mới = Tồn Đầu cũ + Tổng Nhập mới - Tổng Xuất
+            // Suy ra: Tổng Nhập mới = Tồn Cuối mới - Tồn Đầu cũ + Tổng Xuất
+            const totalImportNeeded = newTargetStock - currentItem.initialStock + currentItem.exportStock;
+            const diffImport = totalImportNeeded - currentItem.importStock;
+
+            // 3. Cập nhật tồn kho trực tiếp vào cơ sở dữ liệu
             const refPath = this.editStockForm.isNVL ? 'inventoryNVL/' : 'menu/';
-            
-            db.ref(refPath + this.editStockForm.id).update({ stock: newStock });
-            
-            alert(`Đã cập nhật tồn kho cho "${this.editStockForm.name}" thành ${newStock}!`);
+            db.ref(refPath + this.editStockForm.id).update({ stock: newTargetStock });
+
+            // 4. Nếu có sự chênh lệch nhập, tự động tạo một "Phiếu điều chỉnh tồn đầu/nhập kỳ" để cân đối số liệu báo cáo XNT
+            if (diffImport !== 0) {
+                db.ref('inventoryHistory').push({
+                    type: 'NHAP',
+                    targetWarehouse: this.editStockForm.isNVL ? 'Kho Nguyên Vật Liệu' : 'Kho Sản Phẩm (Thực đơn)',
+                    supplier: 'Điều chỉnh hệ thống',
+                    note: 'Phiếu tự động cân đối Tồn đầu kỳ / Điều chỉnh tồn kho',
+                    paymentMethod: 'Tiền mặt',
+                    totalAmount: 0,
+                    items: [{
+                        id: this.editStockForm.id,
+                        name: this.editStockForm.name,
+                        qty: Math.abs(diffImport),
+                        unit: currentItem.unit || 'ly'
+                    }],
+                    timestamp: new Date().toISOString()
+                });
+            }
+
+            alert(`Đã điều chỉnh thành công tồn kho cho "${this.editStockForm.name}"! Số liệu Tồn đầu và Tồn cuối đã được cân đối.`);
             this.showEditStockModal = false;
         },
         // Hàm mở modal trả nợ
